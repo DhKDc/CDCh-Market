@@ -1,9 +1,9 @@
 "use client";
 import { useEffect, useState } from "react";
-import { supabase, Profile } from "@/lib/supabase";
-import { COMMUNITY_NAME } from "@/lib/config";
-import AuthForm from "@/components/AuthForm";
-import Marketplace from "@/components/Marketplace";
+import { supabase, Profile } from "../lib/supabase";
+import { COMMUNITY_NAME } from "../lib/config";
+import AuthForm from "../components/AuthForm";
+import Marketplace from "../components/Marketplace";
 
 export default function Home() {
   const [userId, setUserId] = useState<string | null | undefined>(undefined);
