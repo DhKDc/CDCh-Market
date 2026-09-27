@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
-import { supabase, Post, PostType } from "@/lib/supabase";
+import { supabase, Post, PostType } from "../lib/supabase";
 
 const TYPES: PostType[] = ["VENTA", "PERMUTA", "CACERIA", "BUSCO", "EXPO"];
 const TYPE_LABEL: Record<PostType, string> = {
