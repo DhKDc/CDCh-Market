@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
 import { supabase, Profile } from "../../lib/supabase";
-import { COMMUNITY_NAME, WHATSAPP_GROUP_LINK } from "@/lib/config";
+import { COMMUNITY_NAME, WHATSAPP_GROUP_LINK } from "../../lib/config";
 
 export default function AdminPage() {
   const [me, setMe] = useState<Profile | null | undefined>(undefined);
