@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState, useCallback, useMemo } from "react";
-import { supabase, Post, PostType } from "@/lib/supabase";
-import ThemeToggle from "@/components/ThemeToggle";
+import { supabase, Post, PostType } from "../lib/supabase";
+import ThemeToggle from "../components/ThemeToggle";
 
 const TYPES: PostType[] = ["VENTA", "PERMUTA", "CACERIA", "BUSCO", "EXPO"];
 const TYPE_LABEL: Record<PostType, string> = {

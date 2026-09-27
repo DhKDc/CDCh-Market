@@ -1,8 +1,8 @@
 "use client";
 import { useState } from "react";
-import { supabase } from "@/lib/supabase";
-import { COMMUNITY_NAME, WHATSAPP_GROUP_LINK } from "@/lib/config";
-import ThemeToggle from "@/components/ThemeToggle";
+import { supabase } from "../lib/supabase";
+import { COMMUNITY_NAME, WHATSAPP_GROUP_LINK } from "../lib/config";
+import ThemeToggle from "../components/ThemeToggle";
 
 export default function AuthForm() {
   const [email, setEmail] = useState("");
