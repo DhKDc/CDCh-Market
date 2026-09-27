@@ -1,6 +1,7 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
-import { supabase, Post, PostType } from "../lib/supabase";
+import { useEffect, useState, useCallback, useMemo } from "react";
+import { supabase, Post, PostType } from "@/lib/supabase";
+import ThemeToggle from "@/components/ThemeToggle";
 
 const TYPES: PostType[] = ["VENTA", "PERMUTA", "CACERIA", "BUSCO", "EXPO"];
 const TYPE_LABEL: Record<PostType, string> = {
@@ -45,6 +46,7 @@ export default function Marketplace({
 }) {
   const [posts, setPosts] = useState<Post[]>([]);
   const [filter, setFilter] = useState<PostType | "TODAS">("TODAS");
+  const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [ventasHoy, setVentasHoy] = useState(0);
@@ -79,30 +81,44 @@ export default function Marketplace({
     })();
   }, [posts, userId]);
 
-  async function markSold(id: string) {
-    await supabase.from("posts").update({ status: "VENDIDO" }).eq("id", id);
-    load();
-  }
+  const visible = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return posts;
+    return posts.filter(
+      (p) =>
+        p.title.toLowerCase().includes(q) ||
+        (p.description || "").toLowerCase().includes(q) ||
+        (p.profiles?.username || "").toLowerCase().includes(q)
+    );
+  }, [posts, search]);
 
   async function logout() {
     await supabase.auth.signOut();
   }
 
   return (
-    <div className="max-w-2xl mx-auto p-4">
+    <div className="max-w-6xl mx-auto p-4">
       <div className="flex justify-between items-center mb-4">
         <h1 className="text-lg font-bold">🚗 Diecast Chile Market</h1>
         <div className="flex items-center gap-3">
+          <ThemeToggle />
           {isAdmin && (
-            <a href="/admin" className="text-sm text-amber-400 underline">
+            <a href="/admin" className="text-sm text-amber-500 dark:text-amber-400 underline">
               Panel admin
             </a>
           )}
-          <button onClick={logout} className="text-sm text-slate-400 underline">
+          <button onClick={logout} className="text-sm text-slate-500 dark:text-slate-400 underline">
             Salir
           </button>
         </div>
       </div>
+
+      <input
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder="🔍 Buscar por título, descripción o usuario..."
+        className="w-full mb-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2"
+      />
 
       <div className="flex gap-2 flex-wrap mb-4">
         {(["TODAS", ...TYPES] as const).map((t) => (
@@ -110,7 +126,9 @@ export default function Marketplace({
             key={t}
             onClick={() => setFilter(t as any)}
             className={`px-3 py-1 rounded-full text-sm ${
-              filter === t ? "bg-amber-500 text-slate-900 font-semibold" : "bg-slate-800"
+              filter === t
+                ? "bg-amber-500 text-slate-900 font-semibold"
+                : "bg-slate-200 dark:bg-slate-800"
             }`}
           >
             {t === "TODAS" ? "Todas" : TYPE_LABEL[t as PostType]}
@@ -126,7 +144,7 @@ export default function Marketplace({
       </button>
 
       {!(isOfficial || isAdmin) && (
-        <p className="text-xs text-slate-400 mb-3">
+        <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
           Ventas usadas hoy: {ventasHoy}/3
         </p>
       )}
@@ -142,61 +160,196 @@ export default function Marketplace({
         />
       )}
 
-      {loading && <p className="text-slate-400">Cargando...</p>}
+      {loading && <p className="text-slate-500 dark:text-slate-400">Cargando...</p>}
 
-      <div className="flex flex-col gap-3 mt-2">
-        {posts.map((p) => (
-          <div key={p.id} className="bg-slate-800 rounded-xl overflow-hidden">
-            {p.photo_url && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={p.photo_url} alt={p.title} className="w-full max-h-80 object-cover" />
-            )}
-            <div className="p-3">
-              <div className="flex justify-between items-start">
-                <span className="text-xs uppercase tracking-wide text-amber-400 font-bold">
-                  {TYPE_LABEL[p.type]}
-                  {p.profiles?.is_official ? " · Tienda/Admin" : ""}
-                </span>
-                {p.status === "VENDIDO" && (
-                  <span className="text-xs bg-red-600 px-2 py-0.5 rounded">VENDIDO</span>
-                )}
-              </div>
-              <h3 className="font-semibold mt-1">{p.title}</h3>
-              {p.description && <p className="text-sm text-slate-300 mt-1">{p.description}</p>}
-              {p.price != null && (
-                <p className="text-amber-300 font-bold mt-1">${p.price.toLocaleString("es-CL")}</p>
-              )}
-              {p.trade_for && (
-                <p className="text-sm text-slate-300 mt-1">🔁 Busca: {p.trade_for}</p>
-              )}
-              <p className="text-xs text-slate-500 mt-2">
-                por {p.profiles?.username || "usuario"} · vence{" "}
-                {new Date(p.expires_at).toLocaleDateString("es-CL")}
-              </p>
-              {p.user_id !== userId && p.profiles?.phone && (
-                <a
-                  href={waLink(p.profiles.phone, p.title)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-2 inline-block text-xs bg-green-600 hover:bg-green-500 px-3 py-1 rounded font-semibold"
-                >
-                  📱 Contactar por WhatsApp
-                </a>
-              )}
-              {p.user_id === userId && p.status === "ACTIVA" && (
-                <button
-                  onClick={() => markSold(p.id)}
-                  className="mt-2 text-xs bg-slate-700 hover:bg-slate-600 px-3 py-1 rounded"
-                >
-                  Marcar como vendido
-                </button>
-              )}
-            </div>
-          </div>
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-3 mt-2">
+        {visible.map((p) => (
+          <PostCard
+            key={p.id}
+            post={p}
+            userId={userId}
+            isAdmin={isAdmin}
+            onChanged={load}
+          />
         ))}
-        {!loading && posts.length === 0 && (
-          <p className="text-slate-500 text-center mt-6">No hay publicaciones aún.</p>
+        {!loading && visible.length === 0 && (
+          <p className="text-slate-500 text-center mt-6 col-span-full">
+            No hay publicaciones que coincidan.
+          </p>
         )}
+      </div>
+    </div>
+  );
+}
+
+function PostCard({
+  post: p,
+  userId,
+  isAdmin,
+  onChanged,
+}: {
+  post: Post;
+  userId: string;
+  isAdmin: boolean;
+  onChanged: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [title, setTitle] = useState(p.title);
+  const [description, setDescription] = useState(p.description || "");
+  const [price, setPrice] = useState(p.price != null ? String(p.price) : "");
+  const [tradeFor, setTradeFor] = useState(p.trade_for || "");
+  const [saving, setSaving] = useState(false);
+
+  const canModerate = p.user_id === userId || isAdmin;
+
+  async function markSold() {
+    await supabase.from("posts").update({ status: "VENDIDO" }).eq("id", p.id);
+    onChanged();
+  }
+
+  async function remove() {
+    if (!confirm(`¿Eliminar "${p.title}"? Esta acción no se puede deshacer.`)) return;
+    await supabase.from("posts").delete().eq("id", p.id);
+    onChanged();
+  }
+
+  async function saveEdit(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    await supabase
+      .from("posts")
+      .update({
+        title,
+        description: description || null,
+        price: price ? Number(price) : null,
+        trade_for: p.type === "PERMUTA" ? tradeFor || null : p.trade_for,
+      })
+      .eq("id", p.id);
+    setSaving(false);
+    setEditing(false);
+    onChanged();
+  }
+
+  if (editing) {
+    return (
+      <form
+        onSubmit={saveEdit}
+        className="bg-white dark:bg-slate-800 rounded-xl p-3 flex flex-col gap-2 border border-amber-500"
+      >
+        <input
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          className="bg-slate-100 dark:bg-slate-900 rounded px-2 py-1"
+        />
+        <textarea
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          className="bg-slate-100 dark:bg-slate-900 rounded px-2 py-1"
+        />
+        {p.type === "VENTA" && (
+          <input
+            type="number"
+            value={price}
+            onChange={(e) => setPrice(e.target.value)}
+            placeholder="Precio"
+            className="bg-slate-100 dark:bg-slate-900 rounded px-2 py-1"
+          />
+        )}
+        {p.type === "PERMUTA" && (
+          <input
+            value={tradeFor}
+            onChange={(e) => setTradeFor(e.target.value)}
+            placeholder="¿Qué busca a cambio?"
+            className="bg-slate-100 dark:bg-slate-900 rounded px-2 py-1"
+          />
+        )}
+        <div className="flex gap-2">
+          <button
+            disabled={saving}
+            className="flex-1 bg-amber-500 hover:bg-amber-400 text-slate-900 font-semibold rounded py-1 text-sm"
+          >
+            {saving ? "Guardando..." : "Guardar"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setEditing(false)}
+            className="flex-1 bg-slate-200 dark:bg-slate-700 rounded py-1 text-sm"
+          >
+            Cancelar
+          </button>
+        </div>
+      </form>
+    );
+  }
+
+  return (
+    <div className="bg-white dark:bg-slate-800 rounded-xl overflow-hidden border border-slate-200 dark:border-transparent">
+      {p.photo_url && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={p.photo_url} alt={p.title} className="w-full h-40 object-cover" />
+      )}
+      <div className="p-3">
+        <div className="flex justify-between items-start">
+          <span className="text-xs uppercase tracking-wide text-amber-600 dark:text-amber-400 font-bold">
+            {TYPE_LABEL[p.type]}
+            {p.profiles?.is_official ? " · Tienda/Admin" : ""}
+          </span>
+          {p.status === "VENDIDO" && (
+            <span className="text-xs bg-red-600 text-white px-2 py-0.5 rounded">VENDIDO</span>
+          )}
+        </div>
+        <h3 className="font-semibold mt-1">{p.title}</h3>
+        {p.description && (
+          <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">{p.description}</p>
+        )}
+        {p.price != null && (
+          <p className="text-amber-600 dark:text-amber-300 font-bold mt-1">
+            ${p.price.toLocaleString("es-CL")}
+          </p>
+        )}
+        {p.trade_for && (
+          <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">🔁 Busca: {p.trade_for}</p>
+        )}
+        <p className="text-xs text-slate-500 mt-2">
+          por {p.profiles?.username || "usuario"} · vence{" "}
+          {new Date(p.expires_at).toLocaleDateString("es-CL")}
+        </p>
+        <div className="flex flex-wrap gap-2 mt-2">
+          {p.user_id !== userId && p.profiles?.phone && (
+            <a
+              href={waLink(p.profiles.phone, p.title)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs bg-green-600 hover:bg-green-500 text-white px-3 py-1 rounded font-semibold"
+            >
+              📱 WhatsApp
+            </a>
+          )}
+          {p.user_id === userId && p.status === "ACTIVA" && (
+            <button
+              onClick={markSold}
+              className="text-xs bg-slate-200 dark:bg-slate-700 px-3 py-1 rounded"
+            >
+              Marcar vendido
+            </button>
+          )}
+          {canModerate && (
+            <button
+              onClick={() => setEditing(true)}
+              className="text-xs bg-slate-200 dark:bg-slate-700 px-3 py-1 rounded"
+            >
+              ✏️ Editar
+            </button>
+          )}
+          {canModerate && (
+            <button
+              onClick={remove}
+              className="text-xs bg-red-600/10 text-red-600 dark:text-red-400 px-3 py-1 rounded"
+            >
+              🗑️ Eliminar
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -265,11 +418,14 @@ function PostForm({
   }
 
   return (
-    <form onSubmit={submit} className="bg-slate-800 rounded-xl p-4 mb-4 flex flex-col gap-3">
+    <form
+      onSubmit={submit}
+      className="bg-white dark:bg-slate-800 rounded-xl p-4 mb-4 flex flex-col gap-3 border border-slate-200 dark:border-transparent"
+    >
       <select
         value={type}
         onChange={(e) => setType(e.target.value as PostType)}
-        className="bg-slate-900 rounded px-3 py-2"
+        className="bg-slate-100 dark:bg-slate-900 rounded px-3 py-2"
       >
         {TYPES.map((t) => (
           <option key={t} value={t}>
@@ -282,13 +438,13 @@ function PostForm({
         placeholder="Título (ej: Hot Wheels Mainline 2026)"
         value={title}
         onChange={(e) => setTitle(e.target.value)}
-        className="bg-slate-900 rounded px-3 py-2"
+        className="bg-slate-100 dark:bg-slate-900 rounded px-3 py-2"
       />
       <textarea
         placeholder="Descripción"
         value={description}
         onChange={(e) => setDescription(e.target.value)}
-        className="bg-slate-900 rounded px-3 py-2"
+        className="bg-slate-100 dark:bg-slate-900 rounded px-3 py-2"
       />
       {type === "VENTA" && (
         <input
@@ -296,7 +452,7 @@ function PostForm({
           placeholder={isOfficial ? "Precio (opcional para tienda/admin)" : "Precio (obligatorio)"}
           value={price}
           onChange={(e) => setPrice(e.target.value)}
-          className="bg-slate-900 rounded px-3 py-2"
+          className="bg-slate-100 dark:bg-slate-900 rounded px-3 py-2"
         />
       )}
       {type === "PERMUTA" && (
@@ -304,7 +460,7 @@ function PostForm({
           placeholder="¿Qué buscas a cambio?"
           value={tradeFor}
           onChange={(e) => setTradeFor(e.target.value)}
-          className="bg-slate-900 rounded px-3 py-2"
+          className="bg-slate-100 dark:bg-slate-900 rounded px-3 py-2"
         />
       )}
       <input
@@ -313,7 +469,7 @@ function PostForm({
         onChange={(e) => setFile(e.target.files?.[0] || null)}
         className="text-sm"
       />
-      {err && <p className="text-red-400 text-sm">{err}</p>}
+      {err && <p className="text-red-500 text-sm">{err}</p>}
       <button
         disabled={saving}
         className="bg-amber-500 hover:bg-amber-400 text-slate-900 font-semibold rounded py-2"

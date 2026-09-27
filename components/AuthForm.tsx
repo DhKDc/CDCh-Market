@@ -1,7 +1,8 @@
 "use client";
 import { useState } from "react";
-import { supabase } from "../lib/supabase";
-import { COMMUNITY_NAME, WHATSAPP_GROUP_LINK } from "../lib/config";
+import { supabase } from "@/lib/supabase";
+import { COMMUNITY_NAME, WHATSAPP_GROUP_LINK } from "@/lib/config";
+import ThemeToggle from "@/components/ThemeToggle";
 
 export default function AuthForm() {
   const [email, setEmail] = useState("");
@@ -32,14 +33,17 @@ export default function AuthForm() {
   }
 
   return (
-    <div className="max-w-sm mx-auto mt-20 bg-slate-800 p-6 rounded-xl">
+    <div className="max-w-sm mx-auto mt-20 bg-white dark:bg-slate-800 p-6 rounded-xl relative">
+      <div className="absolute top-3 right-3">
+        <ThemeToggle />
+      </div>
       <h1 className="text-xl font-bold mb-1 text-center">Diecast Chile Market</h1>
-      <p className="text-xs text-slate-400 text-center mb-4">
+      <p className="text-xs text-slate-500 dark:text-slate-400 text-center mb-4">
         Comunidad {COMMUNITY_NAME}
       </p>
       <form onSubmit={submit} className="flex flex-col gap-3">
         <input
-          className="bg-slate-900 rounded px-3 py-2"
+          className="bg-slate-100 dark:bg-slate-900 rounded px-3 py-2"
           type="email"
           placeholder="Correo"
           value={email}
@@ -47,7 +51,7 @@ export default function AuthForm() {
           required
         />
         <input
-          className="bg-slate-900 rounded px-3 py-2"
+          className="bg-slate-100 dark:bg-slate-900 rounded px-3 py-2"
           type="password"
           placeholder="Contraseña"
           value={password}
@@ -57,7 +61,7 @@ export default function AuthForm() {
         />
         {mode === "signup" && (
           <input
-            className="bg-slate-900 rounded px-3 py-2"
+            className="bg-slate-100 dark:bg-slate-900 rounded px-3 py-2"
             type="tel"
             placeholder="Teléfono (el mismo del grupo de WhatsApp, ej: +56912345678)"
             value={phone}
@@ -70,7 +74,7 @@ export default function AuthForm() {
             href={WHATSAPP_GROUP_LINK}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-xs text-green-400 underline text-center"
+            className="text-xs text-green-600 dark:text-green-400 underline text-center"
           >
             ¿Aún no estás en el grupo? Únete a {COMMUNITY_NAME}
           </a>
@@ -82,9 +86,9 @@ export default function AuthForm() {
           {mode === "login" ? "Entrar" : "Crear cuenta"}
         </button>
       </form>
-      {msg && <p className="text-sm text-amber-300 mt-3">{msg}</p>}
+      {msg && <p className="text-sm text-amber-600 dark:text-amber-300 mt-3">{msg}</p>}
       <button
-        className="text-sm text-slate-400 mt-4 underline w-full text-center"
+        className="text-sm text-slate-500 dark:text-slate-400 mt-4 underline w-full text-center"
         onClick={() => setMode(mode === "login" ? "signup" : "login")}
       >
         {mode === "login" ? "¿Nuevo? Crea una cuenta" : "¿Ya tienes cuenta? Inicia sesión"}

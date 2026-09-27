@@ -63,30 +63,31 @@ create trigger trg_protect_profile_fields
   for each row execute function protect_profile_fields();
 
 -- Reglas de la comunidad, aplicadas al crear una publicación:
---  * VENTA requiere precio y respeta el máx. de 3 al día, salvo tiendas
---    oficiales / admin (profiles.is_official o profiles.is_admin)
+--  * VENTA requiere precio y respeta el máx. de 3 al día, salvo cuentas
+--    marcadas is_official (tiendas oficiales o admins del GRUPO de WhatsApp).
+--    OJO: is_official es independiente de is_admin (el admin del SITIO, que
+--    modera publicaciones). Ser admin del sitio no exime del límite de venta
+--    por sí solo; si esa persona también debe estar exenta, márcala además
+--    como is_official.
 --  * PERMUTA requiere indicar qué se busca a cambio
 create or replace function check_post_rules() returns trigger as $$
 declare
   es_oficial boolean;
-  es_admin boolean;
-  sin_limite boolean;
   estado_perfil profile_status;
   ventas_24h int;
 begin
-  select is_official, is_admin, status into es_oficial, es_admin, estado_perfil
+  select is_official, status into es_oficial, estado_perfil
     from profiles where id = new.user_id;
-  sin_limite := coalesce(es_oficial, false) or coalesce(es_admin, false);
 
   if estado_perfil is distinct from 'APROBADO' then
     raise exception 'Tu cuenta debe ser aprobada por un administrador antes de publicar';
   end if;
 
-  if new.type = 'VENTA' and new.price is null and not sin_limite then
+  if new.type = 'VENTA' and new.price is null and not coalesce(es_oficial, false) then
     raise exception 'El precio es obligatorio para publicaciones de VENTA';
   end if;
 
-  if new.type = 'VENTA' and not sin_limite then
+  if new.type = 'VENTA' and not coalesce(es_oficial, false) then
     select count(*) into ventas_24h from posts
       where user_id = new.user_id
         and type = 'VENTA'
@@ -120,13 +121,25 @@ create policy "cada quien edita su perfil" on profiles
 -- impide que alguien cambie su propio status/is_admin/is_official; esta
 -- policy solo permite el UPDATE en general (ej: para editar username/phone).
 
-create policy "publicaciones activas visibles para todos, y las propias siempre"
+create policy "publicaciones activas visibles para todos, propias y admin ve todo"
   on posts for select
-  using (status = 'ACTIVA' and expires_at > now() or user_id = auth.uid());
+  using (
+    (status = 'ACTIVA' and expires_at > now())
+    or user_id = auth.uid()
+    or exists (select 1 from profiles where id = auth.uid() and is_admin)
+  );
 create policy "solo el dueño crea sus publicaciones" on posts
   for insert with check (auth.uid() = user_id);
-create policy "solo el dueño edita su publicacion (ej: marcar vendido)" on posts
-  for update using (auth.uid() = user_id);
+create policy "el dueño o el admin del sitio editan la publicacion" on posts
+  for update using (
+    auth.uid() = user_id
+    or exists (select 1 from profiles where id = auth.uid() and is_admin)
+  );
+create policy "el dueño o el admin del sitio eliminan la publicacion" on posts
+  for delete using (
+    auth.uid() = user_id
+    or exists (select 1 from profiles where id = auth.uid() and is_admin)
+  );
 
 -- Storage: bucket público para fotos (créalo también desde el panel Storage,
 -- nombre exacto: "fotos", marcado como público).

@@ -54,9 +54,25 @@ update profiles set is_official = true
   where id = (select id from auth.users where email = 'correo-de-la-tienda@ejemplo.com');
 ```
 
+## Actualizar un proyecto que ya está desplegado
+Si ya corriste `schema.sql` antes, **no lo vuelvas a correr completo** (falla porque
+los tipos ya existen). Para traer las últimas mejoras (moderación de admin, etc.),
+pega y ejecuta solo `supabase/migration-2-moderacion.sql` en el SQL Editor, y vuelve
+a desplegar el código (git push a tu repo → Vercel redeploya solo).
+
+## Novedades de esta versión
+- **Admin del sitio vs. admin del grupo**: son roles distintos. `is_admin` (el que
+  aprueba cuentas en `/admin`) ahora también puede editar y eliminar cualquier
+  publicación de cualquier usuario. `is_official` sigue siendo la excepción de
+  "tienda oficial o admin del grupo" para el límite de 3 ventas/precio — si quieres
+  que un admin del sitio también tenga esa excepción, márcalo además como `is_official`.
+- **Buscador** en la página principal, por título, descripción o nombre de usuario.
+- **Grid responsivo**: las publicaciones se acomodan solas según el ancho de pantalla.
+- **Modo claro/oscuro** con un botón ☀️/🌙 que recuerda tu preferencia.
+
 ## Notas
 - Las fotos se comprimen en el navegador antes de subirse (liviano y rápido).
 - El login es con correo y contraseña (Supabase Auth). Se puede cambiar a
   "magic link" (sin contraseña) más adelante si prefieren.
-- Si más adelante quieren notificaciones o buscador, son buenas siguientes
-  mejoras sobre esta base.
+- Si más adelante quieren notificaciones push o edición de fotos, son buenas
+  siguientes mejoras sobre esta base.
