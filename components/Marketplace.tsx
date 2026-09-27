@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { supabase, Post, PostType } from "../lib/supabase";
 import ThemeToggle from "../components/ThemeToggle";
+import ZoomableImage from "../components/ZoomableImage";
 
 const TYPES: PostType[] = ["VENTA", "PERMUTA", "CACERIA", "BUSCO", "EXPO"];
 const TYPE_LABEL: Record<PostType, string> = {
@@ -194,6 +195,7 @@ function PostCard({
   onChanged: () => void;
 }) {
   const [editing, setEditing] = useState(false);
+  const [detailOpen, setDetailOpen] = useState(false);
   const [title, setTitle] = useState(p.title);
   const [description, setDescription] = useState(p.description || "");
   const [price, setPrice] = useState(p.price != null ? String(p.price) : "");
@@ -211,6 +213,21 @@ function PostCard({
     if (!confirm(`¿Eliminar "${p.title}"? Esta acción no se puede deshacer.`)) return;
     await supabase.from("posts").delete().eq("id", p.id);
     onChanged();
+  }
+
+  async function share() {
+    const url = `${window.location.origin}/post/${p.id}`;
+    const text = `Mira esta publicación en Diecast Chile Market: "${p.title}"`;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: p.title, text, url });
+      } catch {
+        /* el usuario canceló el share sheet */
+      }
+    } else {
+      await navigator.clipboard.writeText(`${text}\n${url}`);
+      alert("Link copiado, ya lo puedes pegar en el grupo de WhatsApp.");
+    }
   }
 
   async function saveEdit(e: React.FormEvent) {
@@ -283,38 +300,45 @@ function PostCard({
   }
 
   return (
+    <>
     <div className="bg-white dark:bg-slate-800 rounded-xl overflow-hidden border border-slate-200 dark:border-transparent">
-      {p.photo_url && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={p.photo_url} alt={p.title} className="w-full h-40 object-cover" />
-      )}
-      <div className="p-3">
-        <div className="flex justify-between items-start">
-          <span className="text-xs uppercase tracking-wide text-amber-600 dark:text-amber-400 font-bold">
-            {TYPE_LABEL[p.type]}
-            {p.profiles?.is_official ? " · Tienda/Admin" : ""}
-          </span>
-          {p.status === "VENDIDO" && (
-            <span className="text-xs bg-red-600 text-white px-2 py-0.5 rounded">VENDIDO</span>
+      <div onClick={() => setDetailOpen(true)} className="cursor-pointer">
+        {p.photo_url && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={p.photo_url} alt={p.title} className="w-full h-40 object-cover" />
+        )}
+        <div className="p-3 pb-0">
+          <div className="flex justify-between items-start">
+            <span className="text-xs uppercase tracking-wide text-amber-600 dark:text-amber-400 font-bold">
+              {TYPE_LABEL[p.type]}
+              {p.profiles?.is_official ? " · Tienda/Admin" : ""}
+            </span>
+            {p.status === "VENDIDO" && (
+              <span className="text-xs bg-red-600 text-white px-2 py-0.5 rounded">VENDIDO</span>
+            )}
+          </div>
+          <h3 className="font-semibold mt-1">{p.title}</h3>
+          {p.description && (
+            <p className="text-sm text-slate-600 dark:text-slate-300 mt-1 line-clamp-3">
+              {p.description}
+            </p>
           )}
-        </div>
-        <h3 className="font-semibold mt-1">{p.title}</h3>
-        {p.description && (
-          <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">{p.description}</p>
-        )}
-        {p.price != null && (
-          <p className="text-amber-600 dark:text-amber-300 font-bold mt-1">
-            ${p.price.toLocaleString("es-CL")}
+          {p.price != null && (
+            <p className="text-amber-600 dark:text-amber-300 font-bold mt-1">
+              ${p.price.toLocaleString("es-CL")}
+            </p>
+          )}
+          {p.trade_for && (
+            <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">🔁 Busca: {p.trade_for}</p>
+          )}
+          <p className="text-xs text-slate-500 mt-2">
+            por {p.profiles?.username || "usuario"} · vence{" "}
+            {new Date(p.expires_at).toLocaleDateString("es-CL")}
           </p>
-        )}
-        {p.trade_for && (
-          <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">🔁 Busca: {p.trade_for}</p>
-        )}
-        <p className="text-xs text-slate-500 mt-2">
-          por {p.profiles?.username || "usuario"} · vence{" "}
-          {new Date(p.expires_at).toLocaleDateString("es-CL")}
-        </p>
-        <div className="flex flex-wrap gap-2 mt-2">
+        </div>
+      </div>
+      <div className="p-3 pt-2">
+        <div className="flex flex-wrap gap-2">
           {p.user_id !== userId && p.profiles?.phone && (
             <a
               href={waLink(p.profiles.phone, p.title)}
@@ -333,6 +357,12 @@ function PostCard({
               Marcar vendido
             </button>
           )}
+          <button
+            onClick={share}
+            className="text-xs bg-slate-200 dark:bg-slate-700 px-3 py-1 rounded"
+          >
+            🔗 Compartir
+          </button>
           {canModerate && (
             <button
               onClick={() => setEditing(true)}
@@ -352,6 +382,110 @@ function PostCard({
         </div>
       </div>
     </div>
+
+    {detailOpen && (
+      <div
+        onClick={() => setDetailOpen(false)}
+        className="fixed inset-0 z-40 bg-black/70 flex items-center justify-center p-4"
+      >
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className="bg-white dark:bg-slate-800 rounded-xl max-w-lg w-full max-h-[90vh] overflow-y-auto relative"
+        >
+          <button
+            onClick={() => setDetailOpen(false)}
+            className="absolute top-2 right-2 z-10 text-white bg-black/40 hover:bg-black/60 rounded-full w-8 h-8"
+            aria-label="Cerrar"
+          >
+            ✕
+          </button>
+          {p.photo_url && (
+            <ZoomableImage
+              src={p.photo_url}
+              alt={p.title}
+              className="w-full max-h-96 object-contain bg-slate-100 dark:bg-slate-900"
+            />
+          )}
+          <div className="p-4">
+            <div className="flex justify-between items-start">
+              <span className="text-xs uppercase tracking-wide text-amber-600 dark:text-amber-400 font-bold">
+                {TYPE_LABEL[p.type]}
+                {p.profiles?.is_official ? " · Tienda/Admin" : ""}
+              </span>
+              {p.status === "VENDIDO" && (
+                <span className="text-xs bg-red-600 text-white px-2 py-0.5 rounded">VENDIDO</span>
+              )}
+            </div>
+            <h3 className="font-bold text-lg mt-1">{p.title}</h3>
+            {p.description && (
+              <p className="text-sm text-slate-600 dark:text-slate-300 mt-2 whitespace-pre-wrap">
+                {p.description}
+              </p>
+            )}
+            {p.price != null && (
+              <p className="text-amber-600 dark:text-amber-300 font-bold text-lg mt-2">
+                ${p.price.toLocaleString("es-CL")}
+              </p>
+            )}
+            {p.trade_for && (
+              <p className="text-sm text-slate-600 dark:text-slate-300 mt-2">
+                🔁 Busca: {p.trade_for}
+              </p>
+            )}
+            <p className="text-xs text-slate-500 mt-3">
+              por {p.profiles?.username || "usuario"} · vence{" "}
+              {new Date(p.expires_at).toLocaleDateString("es-CL")}
+            </p>
+            <div className="flex flex-wrap gap-2 mt-3">
+              {p.user_id !== userId && p.profiles?.phone && (
+                <a
+                  href={waLink(p.profiles.phone, p.title)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs bg-green-600 hover:bg-green-500 text-white px-3 py-1 rounded font-semibold"
+                >
+                  📱 WhatsApp
+                </a>
+              )}
+              {p.user_id === userId && p.status === "ACTIVA" && (
+                <button
+                  onClick={markSold}
+                  className="text-xs bg-slate-200 dark:bg-slate-700 px-3 py-1 rounded"
+                >
+                  Marcar vendido
+                </button>
+              )}
+              <button
+                onClick={share}
+                className="text-xs bg-slate-200 dark:bg-slate-700 px-3 py-1 rounded"
+              >
+                🔗 Compartir
+              </button>
+              {canModerate && (
+                <button
+                  onClick={() => {
+                    setDetailOpen(false);
+                    setEditing(true);
+                  }}
+                  className="text-xs bg-slate-200 dark:bg-slate-700 px-3 py-1 rounded"
+                >
+                  ✏️ Editar
+                </button>
+              )}
+              {canModerate && (
+                <button
+                  onClick={remove}
+                  className="text-xs bg-red-600/10 text-red-600 dark:text-red-400 px-3 py-1 rounded"
+                >
+                  🗑️ Eliminar
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 }
 

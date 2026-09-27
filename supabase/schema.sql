@@ -117,9 +117,13 @@ create policy "perfiles visibles para todos" on profiles
   for select using (true);
 create policy "cada quien edita su perfil" on profiles
   for update using (auth.uid() = id);
+create policy "el admin del sitio edita cualquier perfil" on profiles
+  for update using (
+    exists (select 1 from profiles p where p.id = auth.uid() and p.is_admin)
+  );
 -- Nota: el trigger trg_protect_profile_fields (arriba) es lo que realmente
--- impide que alguien cambie su propio status/is_admin/is_official; esta
--- policy solo permite el UPDATE en general (ej: para editar username/phone).
+-- impide que alguien cambie su propio status/is_admin/is_official; estas
+-- policies solo permiten el UPDATE en general (dueño, o admin sobre cualquiera).
 
 create policy "publicaciones activas visibles para todos, propias y admin ve todo"
   on posts for select

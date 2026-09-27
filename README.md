@@ -56,21 +56,41 @@ update profiles set is_official = true
 
 ## Actualizar un proyecto que ya está desplegado
 Si ya corriste `schema.sql` antes, **no lo vuelvas a correr completo** (falla porque
-los tipos ya existen). Para traer las últimas mejoras (moderación de admin, etc.),
-pega y ejecuta solo `supabase/migration-2-moderacion.sql` en el SQL Editor, y vuelve
-a desplegar el código (git push a tu repo → Vercel redeploya solo).
+los tipos ya existen). Para traer las últimas mejoras pega y ejecuta, en este orden,
+`supabase/migration-2-moderacion.sql`, `supabase/migration-3-anon-select.sql` y
+`supabase/migration-4-admin-perfiles.sql` en el SQL Editor, y vuelve a desplegar el
+código (git push a tu repo → Vercel redeploya solo).
 
 ## Novedades de esta versión
+- **Modal de detalle**: tocar la foto o el texto de una publicación abre un modal
+  con la descripción completa (ya no se corta) y la foto más grande, con zoom
+  disponible ahí adentro.
+- **Panel admin ahora controla todo, sin tocar Supabase**:
+  - Pestaña **Usuarios**: aprobar/rechazar, y marcar/quitar "tienda o admin del
+    grupo" (`is_official`) y "admin del sitio" (`is_admin`) con un botón.
+  - Pestaña **Publicaciones**: ver, editar y eliminar cualquier publicación, y
+    marcarla vendida/reactivarla, sin depender de que el dueño lo haga.
+  - **Corregí un bug**: faltaba el permiso (RLS) para que un admin editara el
+    perfil de otra persona — aprobar/rechazar probablemente no estaba
+    funcionando de verdad hasta ahora (`migration-4-admin-perfiles.sql`).
+- **Botón "🔗 Compartir"** en cada publicación: genera un link directo
+  (`/post/<id>`) que cualquiera puede abrir sin buscar nada en la app —ideal para
+  pegarlo en el grupo de WhatsApp—. En celular abre el menú nativo de compartir;
+  en escritorio copia el link. Esa página pública funciona incluso sin iniciar sesión.
 - **Admin del sitio vs. admin del grupo**: son roles distintos. `is_admin` (el que
-  aprueba cuentas en `/admin`) ahora también puede editar y eliminar cualquier
-  publicación de cualquier usuario. `is_official` sigue siendo la excepción de
-  "tienda oficial o admin del grupo" para el límite de 3 ventas/precio — si quieres
-  que un admin del sitio también tenga esa excepción, márcalo además como `is_official`.
+  aprueba cuentas en `/admin`) puede editar y eliminar cualquier publicación de
+  cualquier usuario. `is_official` sigue siendo la excepción de "tienda oficial o
+  admin del grupo" para el límite de 3 ventas/precio — si quieres que un admin del
+  sitio también tenga esa excepción, márcalo además como `is_official` (ahora se
+  hace con un botón en el panel).
 - **Buscador** en la página principal, por título, descripción o nombre de usuario.
 - **Grid responsivo**: las publicaciones se acomodan solas según el ancho de pantalla.
 - **Modo claro/oscuro** con un botón ☀️/🌙 que recuerda tu preferencia.
 
 ## Notas
+- Los imports usan rutas relativas (`../lib/...`, `../components/...`) en vez del
+  alias `@/`, que no se resolvía en el build de Vercel — si agregas archivos nuevos,
+  sigue ese mismo estilo.
 - Las fotos se comprimen en el navegador antes de subirse (liviano y rápido).
 - El login es con correo y contraseña (Supabase Auth). Se puede cambiar a
   "magic link" (sin contraseña) más adelante si prefieren.
