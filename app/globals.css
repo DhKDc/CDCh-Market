@@ -2,6 +2,95 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  @apply bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100;
+/* Paleta tomada de la app Hot Wheels Showcase (tema oscuro) + versión clara. */
+:root {
+  --app: 242 242 244;
+  --surface: 255 255 255;
+  --line: 220 220 226;
+  --seg: 230 230 235;
+  --chip: 233 233 238;
+  --muted: 107 107 115;
+  --fg: 21 21 21;
+  --brand: 0 73 255;
+  --brand-text: 0 73 255;
+  --flame: 214 40 54;
+}
+.dark {
+  --app: 21 21 21;
+  --surface: 26 26 26;
+  --line: 42 42 42;
+  --seg: 37 37 37;
+  --chip: 50 50 50;
+  --muted: 131 131 131;
+  --fg: 255 255 255;
+  --brand: 0 73 255;
+  --brand-text: 73 123 246;
+  --flame: 234 54 66;
+  color-scheme: dark;
+}
+
+@layer base {
+  body {
+    @apply bg-app text-fg font-sans antialiased;
+  }
+  h1, h2, h3 {
+    @apply uppercase font-extrabold tracking-tight;
+  }
+}
+
+@layer components {
+  .page-title {
+    @apply text-[44px] leading-[0.95] font-extrabold uppercase tracking-tight;
+  }
+  .card {
+    @apply bg-surface border border-line rounded-2xl;
+  }
+  .photo-tile {
+    @apply bg-white rounded-xl overflow-hidden;
+  }
+  .input {
+    @apply w-full bg-surface border border-line rounded-2xl px-4 py-3 text-fg placeholder:text-muted focus:outline-none focus:border-brand;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-full text-sm font-semibold bg-chip text-fg transition active:scale-95 disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply bg-brand text-white;
+  }
+  .btn-outline {
+    @apply bg-transparent border border-line;
+  }
+  .btn-danger {
+    @apply bg-transparent border border-flame/50 text-flame;
+  }
+  .icon-btn {
+    @apply w-10 h-10 shrink-0 rounded-full bg-chip text-fg grid place-items-center transition active:scale-95;
+  }
+  .segmented {
+    @apply flex bg-seg rounded-full p-1;
+  }
+  .seg-item {
+    @apply flex-1 text-center py-2.5 rounded-full font-semibold text-fg transition;
+  }
+  .seg-item-on {
+    @apply bg-brand text-white;
+  }
+  .pill {
+    @apply inline-flex items-center gap-1.5 px-4 py-2 rounded-full border border-line text-fg text-sm;
+  }
+  .tagchip {
+    @apply inline-flex items-center px-3 py-1 rounded-full bg-chip text-fg text-xs font-medium;
+  }
+  .chip-blue {
+    @apply inline-flex items-center px-3 py-1 rounded-full bg-brand text-white text-xs font-bold uppercase tracking-wide;
+  }
+  .chip-flame {
+    @apply inline-flex items-center px-3 py-1 rounded-full bg-flame text-white text-xs font-bold uppercase tracking-wide;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
 }

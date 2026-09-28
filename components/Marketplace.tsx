@@ -1,75 +1,29 @@
 "use client";
 import { useEffect, useState, useCallback, useMemo } from "react";
+import {
+  Search, MessageCircle, Share2, Plus, Info, LogOut, ShieldCheck, X,
+  ChevronRight, CheckCheck, RefreshCw, Pencil, Trash2,
+} from "lucide-react";
 import { supabase, Post, PostType } from "../lib/supabase";
 import { formatCLP } from "../lib/format";
-import ThemeToggle from "../components/ThemeToggle";
-import ZoomableImage from "../components/ZoomableImage";
+import {
+  TYPE_LABEL, TYPE_HINT, CREATE_TYPES, isSale, isTrade, matchesFilter, contactLabel,
+} from "../lib/postTypes";
+import { waContactLink } from "../lib/whatsapp";
+import { uploadPhotos, MAX_PHOTOS } from "../lib/photos";
+import ThemeToggle from "./ThemeToggle";
+import PhotoPicker from "./PhotoPicker";
+import PhotoStrip from "./PhotoStrip";
+import Featured from "./Featured";
 
-const TYPES: PostType[] = ["VENTA", "PERMUTA", "BUSCO"];
-const TYPE_LABEL: Record<PostType, string> = {
-  VENTA: "Venta",
-  PERMUTA: "Permuta",
-  BUSCO: "Busco",
-};
+const FILTERS: { key: PostType | "TODAS"; label: string }[] = [
+  { key: "TODAS", label: "Todas" },
+  { key: "VENTA", label: "Venta" },
+  { key: "PERMUTA", label: "Permuta" },
+  { key: "BUSCO", label: "Busco" },
+];
 
-const MAX_PHOTOS = 6;
-
-// Resize + compress an image client-side before upload (keeps storage light).
-async function compressImage(file: File, maxW = 900, quality = 0.72): Promise<Blob> {
-  const bitmap = await createImageBitmap(file);
-  const scale = Math.min(1, maxW / bitmap.width);
-  const canvas = document.createElement("canvas");
-  canvas.width = bitmap.width * scale;
-  canvas.height = bitmap.height * scale;
-  const ctx = canvas.getContext("2d")!;
-  ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-  return new Promise((resolve) =>
-    canvas.toBlob((b) => resolve(b as Blob), "image/jpeg", quality)
-  );
-}
-
-async function uploadPhotos(userId: string, files: File[]): Promise<string[]> {
-  const urls: string[] = [];
-  for (const file of files) {
-    const blob = await compressImage(file);
-    const path = `${userId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`;
-    const { error } = await supabase.storage.from("fotos").upload(path, blob, {
-      contentType: "image/jpeg",
-    });
-    if (error) throw error;
-    urls.push(supabase.storage.from("fotos").getPublicUrl(path).data.publicUrl);
-  }
-  return urls;
-}
-
-// Arma el link de WhatsApp con el número del vendedor y un mensaje precargado.
-function waLink(phone: string, title: string) {
-  const digits = phone.replace(/\D/g, "");
-  const text = encodeURIComponent(
-    `Hola! Vi tu publicación "${title}" en Culture Diecast Chile Market 🚗`
-  );
-  return `https://wa.me/${digits}?text=${text}`;
-}
-
-// Fila de fotos en miniatura, cada una con su propio zoom.
-function PhotoStrip({ urls, alt }: { urls: string[]; alt: string }) {
-  if (urls.length === 0) return null;
-  if (urls.length === 1) {
-    return <ZoomableImage src={urls[0]} alt={alt} className="w-full max-h-96 object-contain bg-slate-100 dark:bg-slate-900" />;
-  }
-  return (
-    <div className="flex gap-1 overflow-x-auto bg-slate-100 dark:bg-slate-900">
-      {urls.map((u, i) => (
-        <ZoomableImage
-          key={i}
-          src={u}
-          alt={`${alt} (${i + 1}/${urls.length})`}
-          className="h-72 w-auto max-w-none object-contain flex-none"
-        />
-      ))}
-    </div>
-  );
-}
+const isClosed = (p: Post) => p.status === "VENDIDO" || new Date(p.expires_at) < new Date();
 
 export default function Marketplace({
   userId,
@@ -90,147 +44,163 @@ export default function Marketplace({
 
   const load = useCallback(async () => {
     setLoading(true);
-    let q = supabase
+    const { data } = await supabase
       .from("posts")
       .select("*, profiles(username, is_official, phone)")
       .order("created_at", { ascending: false });
-    if (filter !== "TODAS") q = q.eq("type", filter);
-    const { data } = await q;
     setPosts((data as any) || []);
     setLoading(false);
-  }, [filter]);
+  }, []);
 
   useEffect(() => {
     load();
   }, [load]);
 
   useEffect(() => {
-    // Count this user's VENTA posts in the last 24h, to show remaining quota.
+    // Ventas (VENTA + AMBOS) de este usuario en las últimas 24 h.
     (async () => {
       const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
       const { count } = await supabase
         .from("posts")
         .select("id", { count: "exact", head: true })
         .eq("user_id", userId)
-        .eq("type", "VENTA")
+        .in("type", ["VENTA", "AMBOS"])
         .gte("created_at", since);
       setVentasHoy(count || 0);
     })();
   }, [posts, userId]);
 
-  // Vendidas o vencidas: solo las ve su dueño (o el admin), por las políticas RLS.
-  const isClosed = (p: Post) => p.status === "VENDIDO" || new Date(p.expires_at) < new Date();
   const closedCount = useMemo(() => posts.filter(isClosed).length, [posts]);
 
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase();
     return posts.filter(
       (p) =>
+        matchesFilter(p.type, filter) &&
         (showClosed || !isClosed(p)) &&
         (!q ||
           p.title.toLowerCase().includes(q) ||
           (p.description || "").toLowerCase().includes(q) ||
           (p.profiles?.username || "").toLowerCase().includes(q))
     );
-  }, [posts, search, showClosed]);
-
-  async function logout() {
-    await supabase.auth.signOut();
-  }
+  }, [posts, search, filter, showClosed]);
 
   return (
-    <div className="max-w-6xl mx-auto p-4">
-      <div className="flex justify-between items-center mb-4">
-        <h1 className="text-base sm:text-lg font-bold leading-tight">🚗 Culture Diecast Chile Market</h1>
-        <div className="flex items-center gap-3">
+    <div className="max-w-6xl mx-auto px-4 pt-4 pb-28">
+      <header className="flex items-center justify-between gap-2 mb-6">
+        <span className="text-flame font-extrabold italic uppercase leading-none tracking-tight">
+          Culture Diecast Chile
+        </span>
+        <div className="flex items-center gap-2">
           <ThemeToggle />
+          <a href="/info" className="icon-btn" aria-label="Info y reglas">
+            <Info size={18} />
+          </a>
           {isAdmin && (
-            <a href="/admin" className="text-sm text-amber-500 dark:text-amber-400 underline">
-              Panel admin
+            <a href="/admin" className="icon-btn" aria-label="Panel de administración">
+              <ShieldCheck size={18} />
             </a>
           )}
-          <button onClick={logout} className="text-sm text-slate-500 dark:text-slate-400 underline">
-            Salir
+          <button
+            onClick={() => supabase.auth.signOut()}
+            className="icon-btn"
+            aria-label="Salir"
+          >
+            <LogOut size={18} />
           </button>
         </div>
-      </div>
+      </header>
 
-      <input
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        placeholder="🔍 Buscar por título, descripción o usuario..."
-        className="w-full mb-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2"
-      />
+      <Featured />
 
-      <div className="flex gap-2 flex-wrap mb-4">
-        {(["TODAS", ...TYPES] as const).map((t) => (
+      <h1 className="page-title mb-5">Mercado</h1>
+
+      <div className="segmented mb-3">
+        {FILTERS.map((f) => (
           <button
-            key={t}
-            onClick={() => setFilter(t as any)}
-            className={`px-3 py-1 rounded-full text-sm ${
-              filter === t
-                ? "bg-amber-500 text-slate-900 font-semibold"
-                : "bg-slate-200 dark:bg-slate-800"
-            }`}
+            key={f.key}
+            onClick={() => setFilter(f.key)}
+            className={`seg-item text-sm sm:text-base ${filter === f.key ? "seg-item-on" : ""}`}
           >
-            {t === "TODAS" ? "Todas" : TYPE_LABEL[t as PostType]}
+            {f.label}
           </button>
         ))}
       </div>
 
-      {closedCount > 0 && (
-        <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300 mb-3">
-          <input
-            type="checkbox"
-            checked={showClosed}
-            onChange={(e) => setShowClosed(e.target.checked)}
-          />
-          Mostrar vendidas y vencidas ({closedCount})
-        </label>
+      <div className="relative mb-3">
+        <Search size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-text" />
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Buscar por título, descripción o usuario"
+          className="input pl-12"
+        />
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        <span className="text-muted mr-1">
+          {visible.length} publicaci{visible.length === 1 ? "ón" : "ones"}
+        </span>
+        {!(isOfficial || isAdmin) && (
+          <span className="pill text-xs font-semibold">Ventas hoy {ventasHoy}/3</span>
+        )}
+        {closedCount > 0 && (
+          <button
+            onClick={() => setShowClosed(!showClosed)}
+            className={`pill text-xs font-semibold ${showClosed ? "!bg-brand !border-brand text-white" : ""}`}
+          >
+            Vendidas y vencidas ({closedCount})
+          </button>
+        )}
+      </div>
+
+      {loading && <p className="text-muted">Cargando...</p>}
+
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+        {visible.map((p) => (
+          <PostCard key={p.id} post={p} userId={userId} isAdmin={isAdmin} onChanged={load} />
+        ))}
+      </div>
+      {!loading && visible.length === 0 && (
+        <p className="text-muted text-center mt-10">No hay publicaciones que coincidan.</p>
       )}
 
       <button
-        onClick={() => setShowForm(!showForm)}
-        className="w-full mb-4 bg-amber-500 hover:bg-amber-400 text-slate-900 font-semibold rounded-lg py-2"
+        onClick={() => setShowForm(true)}
+        aria-label="Nueva publicación"
+        className="fixed bottom-6 right-5 z-30 w-16 h-16 rounded-full bg-brand text-white grid place-items-center shadow-lg shadow-black/40 active:scale-95 transition"
       >
-        {showForm ? "Cancelar" : "+ Nueva publicación"}
+        <Plus size={30} />
       </button>
 
-      {!(isOfficial || isAdmin) && (
-        <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
-          Ventas usadas hoy: {ventasHoy}/3
-        </p>
-      )}
-
       {showForm && (
-        <PostForm
-          userId={userId}
-          isOfficial={isOfficial || isAdmin}
-          onDone={() => {
-            setShowForm(false);
-            load();
-          }}
-        />
+        <div
+          onClick={() => setShowForm(false)}
+          className="fixed inset-0 z-40 bg-black/70 overflow-y-auto"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="card max-w-lg mx-auto my-6 p-4 relative"
+          >
+            <button
+              onClick={() => setShowForm(false)}
+              aria-label="Cerrar"
+              className="icon-btn absolute top-3 right-3"
+            >
+              <X size={18} />
+            </button>
+            <h2 className="text-2xl mb-4">Nueva publicación</h2>
+            <PostForm
+              userId={userId}
+              isOfficial={isOfficial || isAdmin}
+              onDone={() => {
+                setShowForm(false);
+                load();
+              }}
+            />
+          </div>
+        </div>
       )}
-
-      {loading && <p className="text-slate-500 dark:text-slate-400">Cargando...</p>}
-
-      <div className="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-3 mt-2">
-        {visible.map((p) => (
-          <PostCard
-            key={p.id}
-            post={p}
-            userId={userId}
-            isAdmin={isAdmin}
-            onChanged={load}
-          />
-        ))}
-        {!loading && visible.length === 0 && (
-          <p className="text-slate-500 text-center mt-6 col-span-full">
-            No hay publicaciones que coincidan.
-          </p>
-        )}
-      </div>
     </div>
   );
 }
@@ -252,21 +222,23 @@ function PostCard({
   const [description, setDescription] = useState(p.description || "");
   const [price, setPrice] = useState(p.price != null ? String(p.price) : "");
   const [tradeFor, setTradeFor] = useState(p.trade_for || "");
-  const [photos, setPhotos] = useState<string[]>(p.photo_urls || []);
+  const [existing, setExisting] = useState<string[]>(p.photo_urls || []);
   const [newFiles, setNewFiles] = useState<File[]>([]);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  const canModerate = p.user_id === userId || isAdmin;
+  const isOwner = p.user_id === userId;
+  const canModerate = isOwner || isAdmin;
+  const expired = new Date(p.expires_at) < new Date();
   const thumb = p.photo_urls?.[0];
-  const extraCount = (p.photo_urls?.length || 0) - 1;
+  const extra = (p.photo_urls?.length || 0) - 1;
+  const phone = p.profiles?.phone;
 
   async function markSold() {
     await supabase.from("posts").update({ status: "VENDIDO" }).eq("id", p.id);
+    setDetailOpen(false);
     onChanged();
   }
-
-  const expired = new Date(p.expires_at) < new Date();
 
   async function renew() {
     const expires_at = new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString();
@@ -277,6 +249,7 @@ function PostCard({
   async function remove() {
     if (!confirm(`¿Eliminar "${p.title}"? Esta acción no se puede deshacer.`)) return;
     await supabase.from("posts").delete().eq("id", p.id);
+    setDetailOpen(false);
     onChanged();
   }
 
@@ -287,7 +260,7 @@ function PostCard({
       try {
         await navigator.share({ title: p.title, text, url });
       } catch {
-        /* el usuario canceló el share sheet */
+        /* el usuario canceló */
       }
     } else {
       await navigator.clipboard.writeText(`${text}\n${url}`);
@@ -295,109 +268,93 @@ function PostCard({
     }
   }
 
-  function removeExistingPhoto(url: string) {
-    setPhotos((cur) => cur.filter((u) => u !== url));
+  function cancelEdit() {
+    setEditing(false);
+    setErr(null);
+    setExisting(p.photo_urls || []);
+    setNewFiles([]);
   }
 
   async function saveEdit(e: React.FormEvent) {
     e.preventDefault();
     setErr(null);
-    if (photos.length + newFiles.length === 0) {
-      setErr("Debe quedar al menos una foto, o quita la publicación en vez de vaciarla.");
+    if (isSale(p.type) && !price && !p.profiles?.is_official) {
+      setErr("El precio es obligatorio en las ventas.");
+      return;
+    }
+    if (isTrade(p.type) && !tradeFor) {
+      setErr("Indica qué buscas a cambio.");
+      return;
+    }
+    if (existing.length + newFiles.length === 0) {
+      setErr("Deja al menos una foto (o elimina la publicación).");
       return;
     }
     setSaving(true);
     try {
       const uploaded = newFiles.length ? await uploadPhotos(p.user_id, newFiles) : [];
-      await supabase
+      const { error } = await supabase
         .from("posts")
         .update({
           title,
           description: description || null,
-          price: price ? Number(price) : null,
-          trade_for: p.type === "PERMUTA" ? tradeFor || null : p.trade_for,
-          photo_urls: [...photos, ...uploaded],
+          price: isSale(p.type) && price ? Number(price) : null,
+          trade_for: isTrade(p.type) ? tradeFor || null : null,
+          photo_urls: [...existing, ...uploaded],
         })
         .eq("id", p.id);
-      setSaving(false);
+      if (error) throw error;
+      setNewFiles([]);
       setEditing(false);
       onChanged();
     } catch (e: any) {
-      setSaving(false);
       setErr("No se pudo guardar: " + (e?.message || "error desconocido"));
     }
+    setSaving(false);
   }
 
   if (editing) {
     return (
-      <form
-        onSubmit={saveEdit}
-        className="bg-white dark:bg-slate-800 rounded-xl p-3 flex flex-col gap-2 border border-amber-500"
-      >
-        <input
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          className="bg-slate-100 dark:bg-slate-900 rounded px-2 py-1"
-        />
+      <form onSubmit={saveEdit} className="card p-3 flex flex-col gap-3 col-span-2 md:col-span-1 border-brand">
+        <h3 className="text-base">Editar publicación</h3>
+        <input value={title} onChange={(e) => setTitle(e.target.value)} className="input" required />
         <textarea
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          className="bg-slate-100 dark:bg-slate-900 rounded px-2 py-1"
+          className="input"
+          rows={3}
+          placeholder="Descripción"
         />
-        {p.type === "VENTA" && (
+        {isSale(p.type) && (
           <input
             type="number"
             value={price}
             onChange={(e) => setPrice(e.target.value)}
-            placeholder="Precio"
-            className="bg-slate-100 dark:bg-slate-900 rounded px-2 py-1"
+            placeholder="Precio en pesos"
+            className="input"
           />
         )}
-        {p.type === "PERMUTA" && (
+        {isTrade(p.type) && (
           <input
             value={tradeFor}
             onChange={(e) => setTradeFor(e.target.value)}
-            placeholder="¿Qué busca a cambio?"
-            className="bg-slate-100 dark:bg-slate-900 rounded px-2 py-1"
+            placeholder="¿Qué buscas a cambio?"
+            className="input"
           />
         )}
-        {photos.length > 0 && (
-          <div className="flex gap-2 flex-wrap">
-            {photos.map((url) => (
-              <div key={url} className="relative">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={url} alt="" className="w-16 h-16 object-cover rounded" />
-                <button
-                  type="button"
-                  onClick={() => removeExistingPhoto(url)}
-                  className="absolute -top-1 -right-1 bg-red-600 text-white rounded-full w-5 h-5 text-xs leading-none"
-                >
-                  ✕
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-        <input
-          type="file"
-          accept="image/*"
-          multiple
-          onChange={(e) => setNewFiles(Array.from(e.target.files || []))}
-          className="text-sm"
+        <PhotoPicker
+          existing={existing}
+          onExistingChange={setExisting}
+          files={newFiles}
+          onFilesChange={setNewFiles}
+          max={MAX_PHOTOS}
         />
-        {err && <p className="text-red-500 text-xs">{err}</p>}
+        {err && <p className="text-flame text-sm">{err}</p>}
         <div className="flex gap-2">
-          <button
-            disabled={saving}
-            className="flex-1 bg-amber-500 hover:bg-amber-400 text-slate-900 font-semibold rounded py-1 text-sm"
-          >
+          <button disabled={saving} className="btn btn-primary flex-1">
             {saving ? "Guardando..." : "Guardar"}
           </button>
-          <button
-            type="button"
-            onClick={() => setEditing(false)}
-            className="flex-1 bg-slate-200 dark:bg-slate-700 rounded py-1 text-sm"
-          >
+          <button type="button" onClick={cancelEdit} className="btn flex-1">
             Cancelar
           </button>
         </div>
@@ -407,213 +364,164 @@ function PostCard({
 
   return (
     <>
-    <div className="bg-white dark:bg-slate-800 rounded-xl overflow-hidden border border-slate-200 dark:border-transparent">
-      <div onClick={() => setDetailOpen(true)} className="cursor-pointer">
-        {thumb && (
-          <div className="relative">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={thumb} alt={p.title} className="w-full h-40 object-cover" />
-            {extraCount > 0 && (
-              <span className="absolute bottom-1 right-1 text-xs bg-black/60 text-white px-1.5 py-0.5 rounded">
-                +{extraCount} foto{extraCount > 1 ? "s" : ""}
+      <article className="card p-3 flex flex-col">
+        <div onClick={() => setDetailOpen(true)} className="cursor-pointer">
+          <div className="photo-tile relative aspect-[4/3]">
+            {thumb ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={thumb} alt={p.title} className="w-full h-full object-contain" />
+            ) : (
+              <div className="w-full h-full grid place-items-center text-sm text-neutral-500">
+                Sin foto
+              </div>
+            )}
+            {extra > 0 && (
+              <span className="absolute bottom-2 right-2 bg-black/70 text-white text-xs font-semibold px-2 py-0.5 rounded-full">
+                +{extra} foto{extra > 1 ? "s" : ""}
               </span>
             )}
-          </div>
-        )}
-        <div className="p-3 pb-0">
-          <div className="flex justify-between items-start">
-            <span className="text-xs uppercase tracking-wide text-amber-600 dark:text-amber-400 font-bold">
-              {TYPE_LABEL[p.type]}
-              {p.profiles?.is_official ? " · Tienda/Admin" : ""}
-            </span>
-            {p.status === "VENDIDO" && (
-              <span className="text-xs bg-red-600 text-white px-2 py-0.5 rounded">VENDIDO</span>
-            )}
+            {p.status === "VENDIDO" && <span className="chip-flame absolute top-2 left-2">Vendido</span>}
             {p.status === "ACTIVA" && expired && (
-              <span className="text-xs bg-slate-500 text-white px-2 py-0.5 rounded">VENCIDA</span>
+              <span className="chip-flame absolute top-2 left-2">Vencida</span>
             )}
           </div>
-          <h3 className="font-semibold mt-1">{p.title}</h3>
-          {p.description && (
-            <p className="text-sm text-slate-600 dark:text-slate-300 mt-1 line-clamp-3">
-              {p.description}
-            </p>
-          )}
-          {p.price != null && (
-            <p className="text-amber-600 dark:text-amber-300 font-bold mt-1">
-              {formatCLP(p.price)}
-            </p>
-          )}
+          <h3 className="text-[15px] leading-tight mt-3 line-clamp-2 min-h-[2.4em]">{p.title}</h3>
+          <div className="flex flex-wrap items-center gap-1.5 mt-2">
+            <span className="chip-blue">{TYPE_LABEL[p.type]}</span>
+            {p.price != null && <span className="tagchip">{formatCLP(p.price)}</span>}
+            {p.profiles?.is_official && <span className="tagchip">Tienda</span>}
+          </div>
           {p.trade_for && (
-            <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">🔁 Busca: {p.trade_for}</p>
+            <p className="text-xs text-muted mt-2 line-clamp-2">Busca: {p.trade_for}</p>
           )}
-          <p className="text-xs text-slate-500 mt-2">
-            por {p.profiles?.username || "usuario"} · {expired ? "venció" : "vence"}{" "}
+          <p className="text-xs text-muted mt-2">
+            @{p.profiles?.username || "usuario"} · {expired ? "venció" : "vence"}{" "}
             {new Date(p.expires_at).toLocaleDateString("es-CL")}
           </p>
         </div>
-      </div>
-      <div className="p-3 pt-2">
-        <div className="flex flex-wrap gap-2">
-          {p.user_id !== userId && p.profiles?.phone && (
+
+        <div className="mt-3 flex flex-col gap-2">
+          {!isOwner && phone && (
             <a
-              href={waLink(p.profiles.phone, p.title)}
+              href={waContactLink(phone, p.title)}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-xs bg-green-600 hover:bg-green-500 text-white px-3 py-1 rounded font-semibold"
+              className="btn btn-primary w-full"
             >
-              📱 WhatsApp
+              <MessageCircle size={16} /> Contactar
             </a>
           )}
-          {p.user_id === userId && p.status === "ACTIVA" && (
-            <button
-              onClick={markSold}
-              className="text-xs bg-slate-200 dark:bg-slate-700 px-3 py-1 rounded"
-            >
-              Marcar vendido
+          {isOwner && p.status === "ACTIVA" && (
+            <button onClick={markSold} className="btn btn-primary w-full">
+              <CheckCheck size={16} /> Marcar vendido
             </button>
           )}
-          {canModerate && p.status === "ACTIVA" && (
+          <div className="flex rounded-full border border-line overflow-hidden">
             <button
-              onClick={renew}
-              className="text-xs bg-slate-200 dark:bg-slate-700 px-3 py-1 rounded"
+              onClick={share}
+              aria-label="Compartir"
+              className="flex-1 py-2.5 grid place-items-center"
             >
-              🔄 Renovar 7 días
+              <Share2 size={17} />
             </button>
-          )}
-          <button
-            onClick={share}
-            className="text-xs bg-slate-200 dark:bg-slate-700 px-3 py-1 rounded"
-          >
-            🔗 Compartir
-          </button>
-          {canModerate && (
             <button
-              onClick={() => setEditing(true)}
-              className="text-xs bg-slate-200 dark:bg-slate-700 px-3 py-1 rounded"
+              onClick={() => setDetailOpen(true)}
+              aria-label="Ver detalle"
+              className="flex-1 py-2.5 grid place-items-center border-l border-line"
             >
-              ✏️ Editar
+              <ChevronRight size={18} />
             </button>
-          )}
-          {canModerate && (
-            <button
-              onClick={remove}
-              className="text-xs bg-red-600/10 text-red-600 dark:text-red-400 px-3 py-1 rounded"
-            >
-              🗑️ Eliminar
-            </button>
-          )}
+          </div>
         </div>
-      </div>
-    </div>
+      </article>
 
-    {detailOpen && (
-      <div
-        onClick={() => setDetailOpen(false)}
-        className="fixed inset-0 z-40 bg-black/70 flex items-center justify-center p-4"
-      >
+      {detailOpen && (
         <div
-          onClick={(e) => e.stopPropagation()}
-          className="bg-white dark:bg-slate-800 rounded-xl max-w-lg w-full max-h-[90vh] overflow-y-auto relative"
+          onClick={() => setDetailOpen(false)}
+          className="fixed inset-0 z-40 bg-black/70 flex items-center justify-center p-4"
         >
-          <button
-            onClick={() => setDetailOpen(false)}
-            className="absolute top-2 right-2 z-10 text-white bg-black/40 hover:bg-black/60 rounded-full w-8 h-8"
-            aria-label="Cerrar"
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="card w-full max-w-lg max-h-[90vh] overflow-y-auto p-4 relative"
           >
-            ✕
-          </button>
-          <PhotoStrip urls={p.photo_urls || []} alt={p.title} />
-          <div className="p-4">
-            <div className="flex justify-between items-start">
-              <span className="text-xs uppercase tracking-wide text-amber-600 dark:text-amber-400 font-bold">
-                {TYPE_LABEL[p.type]}
-                {p.profiles?.is_official ? " · Tienda/Admin" : ""}
-              </span>
-              {p.status === "VENDIDO" && (
-                <span className="text-xs bg-red-600 text-white px-2 py-0.5 rounded">VENDIDO</span>
+            <button
+              onClick={() => setDetailOpen(false)}
+              aria-label="Cerrar"
+              className="icon-btn absolute top-3 right-3 z-10 !bg-black/70 text-white"
+            >
+              <X size={18} />
+            </button>
+            <PhotoStrip urls={p.photo_urls || []} alt={p.title} />
+            <div className="mt-3">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="chip-blue">{TYPE_LABEL[p.type]}</span>
+                {p.profiles?.is_official && <span className="tagchip">Tienda</span>}
+                {p.status === "VENDIDO" && <span className="chip-flame">Vendido</span>}
+                {p.status === "ACTIVA" && expired && <span className="chip-flame">Vencida</span>}
+              </div>
+              <h2 className="text-2xl leading-tight mt-2">{p.title}</h2>
+              {p.price != null && (
+                <p className="text-2xl font-extrabold text-brand-text mt-2">{formatCLP(p.price)}</p>
               )}
-              {p.status === "ACTIVA" && expired && (
-                <span className="text-xs bg-slate-500 text-white px-2 py-0.5 rounded">VENCIDA</span>
+              {p.description && (
+                <p className="text-sm text-muted mt-3 whitespace-pre-wrap">{p.description}</p>
               )}
-            </div>
-            <h3 className="font-bold text-lg mt-1">{p.title}</h3>
-            {p.description && (
-              <p className="text-sm text-slate-600 dark:text-slate-300 mt-2 whitespace-pre-wrap">
-                {p.description}
+              {p.trade_for && (
+                <p className="text-sm mt-3">
+                  <span className="text-muted">Busca a cambio: </span>
+                  {p.trade_for}
+                </p>
+              )}
+              <p className="text-xs text-muted mt-3">
+                @{p.profiles?.username || "usuario"} · {expired ? "venció" : "vence"}{" "}
+                {new Date(p.expires_at).toLocaleDateString("es-CL")}
               </p>
-            )}
-            {p.price != null && (
-              <p className="text-amber-600 dark:text-amber-300 font-bold text-lg mt-2">
-                {formatCLP(p.price)}
-              </p>
-            )}
-            {p.trade_for && (
-              <p className="text-sm text-slate-600 dark:text-slate-300 mt-2">
-                🔁 Busca: {p.trade_for}
-              </p>
-            )}
-            <p className="text-xs text-slate-500 mt-3">
-              por {p.profiles?.username || "usuario"} · {expired ? "venció" : "vence"}{" "}
-              {new Date(p.expires_at).toLocaleDateString("es-CL")}
-            </p>
-            <div className="flex flex-wrap gap-2 mt-3">
-              {p.user_id !== userId && p.profiles?.phone && (
-                <a
-                  href={waLink(p.profiles.phone, p.title)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs bg-green-600 hover:bg-green-500 text-white px-3 py-1 rounded font-semibold"
-                >
-                  📱 WhatsApp
-                </a>
-              )}
-              {p.user_id === userId && p.status === "ACTIVA" && (
-                <button
-                  onClick={markSold}
-                  className="text-xs bg-slate-200 dark:bg-slate-700 px-3 py-1 rounded"
-                >
-                  Marcar vendido
+
+              <div className="flex flex-wrap gap-2 mt-4">
+                {!isOwner && phone && (
+                  <a
+                    href={waContactLink(phone, p.title)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn btn-primary w-full"
+                  >
+                    <MessageCircle size={16} /> {contactLabel(p.type)}
+                  </a>
+                )}
+                {isOwner && p.status === "ACTIVA" && (
+                  <button onClick={markSold} className="btn btn-primary w-full">
+                    <CheckCheck size={16} /> Marcar vendido
+                  </button>
+                )}
+                <button onClick={share} className="btn btn-outline">
+                  <Share2 size={16} /> Compartir
                 </button>
-              )}
-              {canModerate && p.status === "ACTIVA" && (
-                <button
-                  onClick={renew}
-                  className="text-xs bg-slate-200 dark:bg-slate-700 px-3 py-1 rounded"
-                >
-                  🔄 Renovar 7 días
-                </button>
-              )}
-              <button
-                onClick={share}
-                className="text-xs bg-slate-200 dark:bg-slate-700 px-3 py-1 rounded"
-              >
-                🔗 Compartir
-              </button>
-              {canModerate && (
-                <button
-                  onClick={() => {
-                    setDetailOpen(false);
-                    setEditing(true);
-                  }}
-                  className="text-xs bg-slate-200 dark:bg-slate-700 px-3 py-1 rounded"
-                >
-                  ✏️ Editar
-                </button>
-              )}
-              {canModerate && (
-                <button
-                  onClick={remove}
-                  className="text-xs bg-red-600/10 text-red-600 dark:text-red-400 px-3 py-1 rounded"
-                >
-                  🗑️ Eliminar
-                </button>
-              )}
+                {canModerate && p.status === "ACTIVA" && (
+                  <button onClick={renew} className="btn btn-outline">
+                    <RefreshCw size={16} /> Renovar 7 días
+                  </button>
+                )}
+                {canModerate && (
+                  <button
+                    onClick={() => {
+                      setDetailOpen(false);
+                      setEditing(true);
+                    }}
+                    className="btn btn-outline"
+                  >
+                    <Pencil size={16} /> Editar
+                  </button>
+                )}
+                {canModerate && (
+                  <button onClick={remove} className="btn btn-danger">
+                    <Trash2 size={16} /> Eliminar
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>
-      </div>
-    )}
+      )}
     </>
   );
 }
@@ -639,11 +547,11 @@ function PostForm({
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setErr(null);
-    if (type === "VENTA" && !isOfficial && !price) {
-      setErr("El precio es obligatorio para publicaciones de VENTA.");
+    if (isSale(type) && !isOfficial && !price) {
+      setErr("El precio es obligatorio en las ventas.");
       return;
     }
-    if (type === "PERMUTA" && !tradeFor) {
+    if (isTrade(type) && !tradeFor) {
       setErr("Indica qué buscas a cambio.");
       return;
     }
@@ -661,13 +569,13 @@ function PostForm({
       type,
       title,
       description: description || null,
-      price: price ? Number(price) : null,
-      trade_for: type === "PERMUTA" ? tradeFor : null,
+      price: isSale(type) && price ? Number(price) : null,
+      trade_for: isTrade(type) ? tradeFor : null,
       photo_urls,
     });
     setSaving(false);
     if (error) {
-      // Surfaces the daily-limit / price-required errors raised by the DB trigger.
+      // Muestra los errores de reglas (límite diario, precio, etc.) que lanza la base de datos.
       setErr(error.message);
       return;
     }
@@ -675,69 +583,63 @@ function PostForm({
   }
 
   return (
-    <form
-      onSubmit={submit}
-      className="bg-white dark:bg-slate-800 rounded-xl p-4 mb-4 flex flex-col gap-3 border border-slate-200 dark:border-transparent"
-    >
-      <select
-        value={type}
-        onChange={(e) => setType(e.target.value as PostType)}
-        className="bg-slate-100 dark:bg-slate-900 rounded px-3 py-2"
-      >
-        {TYPES.map((t) => (
-          <option key={t} value={t}>
-            {TYPE_LABEL[t]}
-          </option>
-        ))}
-      </select>
+    <form onSubmit={submit} className="flex flex-col gap-4">
+      <div>
+        <p className="text-sm font-semibold mb-2">¿Qué quieres publicar?</p>
+        <div className="grid grid-cols-2 gap-2">
+          {CREATE_TYPES.map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => setType(t)}
+              className={`btn ${type === t ? "btn-primary" : "btn-outline"}`}
+            >
+              {TYPE_LABEL[t]}
+            </button>
+          ))}
+        </div>
+        <p className="text-xs text-muted mt-2">{TYPE_HINT[type]}</p>
+      </div>
+
       <input
         required
-        placeholder="Título (ej: Hot Wheels Mainline 2026)"
+        placeholder="Título (ej: Lote 5 Hot Wheels Mainline 2026)"
         value={title}
         onChange={(e) => setTitle(e.target.value)}
-        className="bg-slate-100 dark:bg-slate-900 rounded px-3 py-2"
+        className="input"
       />
       <textarea
-        placeholder="Descripción"
+        placeholder="Descripción (estado, cantidad, detalles del lote...)"
         value={description}
         onChange={(e) => setDescription(e.target.value)}
-        className="bg-slate-100 dark:bg-slate-900 rounded px-3 py-2"
+        className="input"
+        rows={3}
       />
-      {type === "VENTA" && (
+      {isSale(type) && (
         <input
           type="number"
-          placeholder={isOfficial ? "Precio (opcional para tienda/admin)" : "Precio (obligatorio)"}
+          inputMode="numeric"
+          placeholder={
+            isOfficial ? "Precio en pesos (opcional para tiendas)" : "Precio en pesos (obligatorio)"
+          }
           value={price}
           onChange={(e) => setPrice(e.target.value)}
-          className="bg-slate-100 dark:bg-slate-900 rounded px-3 py-2"
+          className="input"
         />
       )}
-      {type === "PERMUTA" && (
+      {isTrade(type) && (
         <input
-          placeholder="¿Qué buscas a cambio?"
+          placeholder="¿Qué buscas a cambio? (nombre del auto o descripción)"
           value={tradeFor}
           onChange={(e) => setTradeFor(e.target.value)}
-          className="bg-slate-100 dark:bg-slate-900 rounded px-3 py-2"
+          className="input"
         />
       )}
-      <input
-        type="file"
-        accept="image/*"
-        multiple
-        onChange={(e) => setFiles(Array.from(e.target.files || []).slice(0, MAX_PHOTOS))}
-        className="text-sm"
-      />
-      {files.length > 0 && (
-        <p className="text-xs text-slate-500">
-          {files.length} foto{files.length > 1 ? "s" : ""} seleccionada{files.length > 1 ? "s" : ""}
-          {files.length >= MAX_PHOTOS ? ` (máx. ${MAX_PHOTOS})` : ""}
-        </p>
-      )}
-      {err && <p className="text-red-500 text-sm">{err}</p>}
-      <button
-        disabled={saving}
-        className="bg-amber-500 hover:bg-amber-400 text-slate-900 font-semibold rounded py-2"
-      >
+
+      <PhotoPicker files={files} onFilesChange={setFiles} max={MAX_PHOTOS} />
+
+      {err && <p className="text-flame text-sm">{err}</p>}
+      <button disabled={saving} className="btn btn-primary w-full py-3 text-base">
         {saving ? "Publicando..." : "Publicar"}
       </button>
     </form>

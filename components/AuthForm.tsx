@@ -48,7 +48,7 @@ export default function AuthForm() {
       }
     }
 
-    const { error } =
+    const { data, error } =
       mode === "login"
         ? await supabase.auth.signInWithPassword({ email, password })
         : await supabase.auth.signUp({
@@ -64,6 +64,10 @@ export default function AuthForm() {
         setMsg("Ese nombre de usuario ya existe. Prueba con otro.");
       } else if (mode === "login" && error.message.toLowerCase().includes("invalid login")) {
         setMsg("Usuario o contraseña incorrectos.");
+      } else if (error.message.toLowerCase().includes("rate limit")) {
+        setMsg(
+          "Supabase está limitando el envío de correos de confirmación. Casi seguro \"Confirm email\" sigue activado: el admin debe desactivarlo en Supabase (Authentication → Providers → Email)."
+        );
       } else if (error.message.toLowerCase().includes("database error")) {
         setMsg("No se pudo crear la cuenta. Es probable que ese nombre de usuario ya esté en uso; prueba con otro.");
       } else if (error.message.toLowerCase().includes("is invalid")) {
@@ -71,6 +75,13 @@ export default function AuthForm() {
       } else {
         setMsg(error.message);
       }
+      return;
+    }
+    // Sin sesión tras registrarse = Supabase sigue exigiendo confirmar el correo.
+    if (mode === "signup" && !data?.session) {
+      setMsg(
+        "La cuenta se creó, pero Supabase está pidiendo confirmar un correo que no existe. El admin debe desactivar \"Confirm email\" en Supabase (Authentication → Providers → Email) y luego ejecutar el SQL del README para habilitar cuentas ya creadas."
+      );
       return;
     }
     if (mode === "signup") {
@@ -81,17 +92,39 @@ export default function AuthForm() {
   }
 
   return (
-    <div className="max-w-sm mx-auto mt-20 bg-white dark:bg-slate-800 p-6 rounded-xl relative">
-      <div className="absolute top-3 right-3">
+    <div className="max-w-md mx-auto px-4 pt-6 pb-10">
+      <div className="flex items-center justify-between mb-10">
+        <span className="text-flame font-extrabold italic uppercase leading-none tracking-tight">
+          Culture Diecast Chile
+        </span>
         <ThemeToggle />
       </div>
-      <h1 className="text-xl font-bold mb-1 text-center">Culture Diecast Chile Market</h1>
-      <p className="text-xs text-slate-500 dark:text-slate-400 text-center mb-4">
-        Compra, vende y permuta con la comunidad
-      </p>
+
+      <h1 className="page-title mb-2">
+        {mode === "login" ? "Entrar" : "Crear cuenta"}
+      </h1>
+      <p className="text-muted mb-6">Compra, vende y permuta con la comunidad.</p>
+
+      <div className="segmented mb-5">
+        <button
+          type="button"
+          onClick={() => { setMode("login"); setMsg(null); }}
+          className={`seg-item ${mode === "login" ? "seg-item-on" : ""}`}
+        >
+          Entrar
+        </button>
+        <button
+          type="button"
+          onClick={() => { setMode("signup"); setMsg(null); }}
+          className={`seg-item ${mode === "signup" ? "seg-item-on" : ""}`}
+        >
+          Crear cuenta
+        </button>
+      </div>
+
       <form onSubmit={submit} className="flex flex-col gap-3">
         <input
-          className="bg-slate-100 dark:bg-slate-900 rounded px-3 py-2"
+          className="input"
           type="text"
           placeholder={mode === "login" ? "Usuario (o tu correo, si tu cuenta es antigua)" : "Nombre de usuario"}
           value={username}
@@ -101,7 +134,7 @@ export default function AuthForm() {
           autoCapitalize="none"
         />
         <input
-          className="bg-slate-100 dark:bg-slate-900 rounded px-3 py-2"
+          className="input"
           type="password"
           placeholder="Contraseña"
           value={password}
@@ -111,38 +144,38 @@ export default function AuthForm() {
         />
         {mode === "signup" && (
           <input
-            className="bg-slate-100 dark:bg-slate-900 rounded px-3 py-2"
+            className="input"
             type="tel"
-            placeholder="Teléfono (el mismo del grupo, ej: +56 9 1234 5678)"
+            placeholder="Teléfono del grupo, ej: +56 9 1234 5678"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
             required
           />
         )}
         {mode === "signup" && (
-          <a
-            href={WHATSAPP_GROUP_LINK}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs text-green-600 dark:text-green-400 underline text-center"
-          >
-            ¿Aún no estás en el grupo? Únete a {COMMUNITY_NAME}
-          </a>
+          <p className="text-xs text-muted">
+            Un administrador revisará que tu número esté en el grupo de WhatsApp antes de
+            habilitarte para publicar.{" "}
+            <a
+              href={WHATSAPP_GROUP_LINK}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-brand-text font-semibold underline"
+            >
+              ¿Aún no estás? Únete a {COMMUNITY_NAME}
+            </a>
+          </p>
         )}
-        <button
-          disabled={loading}
-          className="bg-amber-500 hover:bg-amber-400 rounded py-2 font-semibold text-slate-900"
-        >
-          {mode === "login" ? "Entrar" : "Crear cuenta"}
+        <button disabled={loading} className="btn btn-primary w-full py-3 text-base mt-1">
+          {loading ? "Un momento..." : mode === "login" ? "Entrar" : "Crear cuenta"}
         </button>
       </form>
-      {msg && <p className="text-sm text-amber-600 dark:text-amber-300 mt-3">{msg}</p>}
-      <button
-        className="text-sm text-slate-500 dark:text-slate-400 mt-4 underline w-full text-center"
-        onClick={() => setMode(mode === "login" ? "signup" : "login")}
-      >
-        {mode === "login" ? "¿Nuevo? Crea una cuenta" : "¿Ya tienes cuenta? Inicia sesión"}
-      </button>
+
+      {msg && <p className="text-sm text-flame mt-4">{msg}</p>}
+
+      <a href="/info" className="block text-center text-sm text-muted underline mt-8">
+        Información, reglas y cómo usar la app
+      </a>
     </div>
   );
 }

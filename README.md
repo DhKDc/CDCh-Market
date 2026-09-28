@@ -1,7 +1,8 @@
 # Culture Diecast Chile Market
 
 Web app para la comunidad Culture Diecast Chile: ventas, permutas y "busco" de
-carritos, reemplazando el descontrol de WhatsApp. (Cacería y Expo quedan solo en
+carritos, reemplazando el descontrol de WhatsApp. Su diseño toma como referencia la app
+Hot Wheels Showcase (tema oscuro, azul `#0049ff`, tarjetas con foto sobre fondo blanco). (Cacería y Expo quedan solo en
 el chat del grupo, no en la app.)
 
 ## Reglas (aplicadas en la base de datos, no solo en pantalla)
@@ -73,6 +74,10 @@ SQL Editor, en orden, las migraciones que aún no hayas corrido:
 5. `migration-6-fix-signup-trigger.sql` (**arregla el error 500 al registrarse**: 
    `relation "profiles" does not exist`; al final devuelve `profiles` si la tabla existe)
 
+6. `migration-7-ambos-novedades.sql` (publicaciones "venta y permuta", reglas de ventas
+   y la sección de Novedades con "más vistas de la semana"). Ejecútala **antes** de
+   subir el código nuevo, o el formulario de publicar fallará.
+
 Y luego, en Supabase: **Authentication → Providers → Email → desactiva "Confirm email"**.
 Después haz push al repo y Vercel redeploya.
 
@@ -110,3 +115,38 @@ La app se puede instalar en el celular sin pasar por tiendas:
   dominio tuyo (ej. `tudominio.cl`), redeploya y prueba con un usuario nuevo. Ojo: cambiar
   el dominio después de tener usuarios registrados los deja sin poder entrar con usuario,
   así que hazlo antes de abrir el registro al grupo.
+
+## "Email rate limit exceeded" al registrarse
+Significa que **"Confirm email" sigue activado** en Supabase: cada registro intenta enviar un
+correo de confirmación al correo interno (que no existe) y se agota el límite de envíos.
+1. Supabase → Authentication → Providers → Email → **desactiva "Confirm email"** y guarda.
+2. Espera un rato o prueba con otro usuario: el límite de correos se reinicia solo por hora.
+3. Las cuentas de prueba que se crearon *mientras estaba activado* quedaron sin confirmar y
+   no pueden entrar. Habilítalas (solo las internas de la app) en el SQL Editor:
+```sql
+update auth.users
+   set email_confirmed_at = now()
+ where email_confirmed_at is null
+   and email like '%@cdch-market.app';   -- o tu NEXT_PUBLIC_AUTH_EMAIL_DOMAIN
+```
+   También puedes borrar esas cuentas en Authentication → Users y registrarlas de nuevo.
+
+## Tipos de publicación y límites
+- **Venta**, **Permuta**, **Venta y permuta** (ambas) y **Busco**.
+- Solo las ventas (Venta y "Venta y permuta") tienen precio obligatorio y el tope de
+  **3 por día**. Permutas y búsquedas no tienen límite.
+- Las tiendas oficiales y admins del grupo (`is_official`) no tienen tope ni precio obligatorio.
+- El botón **Contactar** abre WhatsApp con el mensaje: *Hola! Te hablo por "<título>" que vi
+  en Culture Diecast Chile Market*.
+
+## Novedades y anuncios (solo admins del sitio)
+En `/admin` → pestaña **Novedades** se suben futuros autos, preventas, rifas y otras novedades
+(con fotos, texto y fecha opcional). Aparecen arriba de la página principal en un carrusel con
+dos vistas: **Recientes** (las últimas 5) y **Más vistas (7 días)** (las 5 con más visitas en
+la última semana; cuenta una vista por usuario por día).
+
+## Diseño
+Los colores viven en variables CSS en `app/globals.css` (`--brand` azul, `--flame` rojo,
+`--app`/`--surface`/`--line` para fondos y bordes, tema oscuro por defecto y versión clara).
+Para ajustar la paleta basta con cambiar esos valores. Se usa la fuente Poppins (Google Fonts)
+e íconos de `lucide-react`. No se usa el logo de Hot Wheels (es marca de Mattel).

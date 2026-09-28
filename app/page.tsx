@@ -35,16 +35,16 @@ export default function Home() {
 
   if (profile.status === "PENDIENTE") {
     return (
-      <div className="max-w-sm mx-auto mt-24 text-center bg-slate-800 p-6 rounded-xl">
+      <div className="card max-w-sm mx-auto mt-24 text-center p-6">
         <p className="text-4xl mb-3">⏳</p>
         <h1 className="font-bold mb-2">Cuenta pendiente de aprobación</h1>
-        <p className="text-sm text-slate-300">
+        <p className="text-sm text-muted">
           Un administrador está revisando tu número de teléfono contra la lista del grupo{" "}
           {COMMUNITY_NAME}. Te avisaremos cuando puedas publicar.
         </p>
         <button
           onClick={() => supabase.auth.signOut()}
-          className="text-xs text-slate-400 underline mt-4"
+          className="text-xs text-muted underline mt-4"
         >
           Salir
         </button>
@@ -54,16 +54,16 @@ export default function Home() {
 
   if (profile.status === "RECHAZADO") {
     return (
-      <div className="max-w-sm mx-auto mt-24 text-center bg-slate-800 p-6 rounded-xl">
+      <div className="card max-w-sm mx-auto mt-24 text-center p-6">
         <p className="text-4xl mb-3">🚫</p>
         <h1 className="font-bold mb-2">Solicitud no aprobada</h1>
-        <p className="text-sm text-slate-300">
+        <p className="text-sm text-muted">
           No pudimos verificar tu número contra el grupo de WhatsApp. Contacta a un administrador
           si crees que es un error.
         </p>
         <button
           onClick={() => supabase.auth.signOut()}
-          className="text-xs text-slate-400 underline mt-4"
+          className="text-xs text-muted underline mt-4"
         >
           Salir
         </button>

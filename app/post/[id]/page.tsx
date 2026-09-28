@@ -1,23 +1,13 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import { ArrowLeft, MessageCircle } from "lucide-react";
 import { supabase, Post } from "../../../lib/supabase";
-import ZoomableImage from "../../../components/ZoomableImage";
 import { formatCLP } from "../../../lib/format";
-
-const TYPE_LABEL: Record<string, string> = {
-  VENTA: "Venta",
-  PERMUTA: "Permuta",
-  BUSCO: "Busco",
-};
-
-function waLink(phone: string, title: string) {
-  const digits = phone.replace(/\D/g, "");
-  const text = encodeURIComponent(
-    `Hola! Vi tu publicación "${title}" en Culture Diecast Chile Market 🚗`
-  );
-  return `https://wa.me/${digits}?text=${text}`;
-}
+import { TYPE_LABEL, contactLabel } from "../../../lib/postTypes";
+import { waContactLink } from "../../../lib/whatsapp";
+import PhotoStrip from "../../../components/PhotoStrip";
+import ThemeToggle from "../../../components/ThemeToggle";
 
 export default function PostDetailPage() {
   const params = useParams();
@@ -38,13 +28,13 @@ export default function PostDetailPage() {
 
   if (!post) {
     return (
-      <div className="max-w-md mx-auto mt-24 text-center p-6">
-        <p className="text-4xl mb-3">🤷</p>
-        <h1 className="font-bold mb-2">Publicación no disponible</h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
-          Puede que ya haya expirado, se haya eliminado, o que necesites iniciar sesión para verla.
+      <div className="card max-w-md mx-auto mt-24 text-center p-6">
+        <h1 className="text-2xl mb-2">Publicación no disponible</h1>
+        <p className="text-sm text-muted mb-5">
+          Puede que ya haya expirado, se haya vendido o eliminado, o que necesites iniciar sesión
+          para verla.
         </p>
-        <a href="/" className="text-amber-600 dark:text-amber-400 underline">
+        <a href="/" className="btn btn-primary">
           Ir a Culture Diecast Chile Market
         </a>
       </div>
@@ -52,63 +42,46 @@ export default function PostDetailPage() {
   }
 
   return (
-    <div className="max-w-md mx-auto p-4">
-      <a href="/" className="text-sm text-slate-500 dark:text-slate-400 underline">
-        ← Ver todas las publicaciones
-      </a>
-      <div className="bg-white dark:bg-slate-800 rounded-xl overflow-hidden mt-3 border border-slate-200 dark:border-transparent">
-        {post.photo_urls?.length > 0 && (
-          <div className="flex gap-1 overflow-x-auto bg-slate-100 dark:bg-slate-900">
-            {post.photo_urls.map((u, i) => (
-              <ZoomableImage
-                key={i}
-                src={u}
-                alt={`${post.title} (${i + 1}/${post.photo_urls.length})`}
-                className={
-                  post.photo_urls.length === 1
-                    ? "w-full max-h-96 object-contain"
-                    : "h-72 w-auto max-w-none object-contain flex-none"
-                }
-              />
-            ))}
+    <div className="max-w-lg mx-auto px-4 pt-4 pb-10">
+      <div className="flex items-center justify-between mb-4">
+        <a href="/" className="btn btn-outline">
+          <ArrowLeft size={16} /> Ver todas
+        </a>
+        <ThemeToggle />
+      </div>
+      <div className="card p-4">
+        <PhotoStrip urls={post.photo_urls || []} alt={post.title} />
+        <div className="mt-3">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="chip-blue">{TYPE_LABEL[post.type]}</span>
+            {post.profiles?.is_official && <span className="tagchip">Tienda</span>}
+            {post.status === "VENDIDO" && <span className="chip-flame">Vendido</span>}
           </div>
-        )}
-        <div className="p-4">
-          <div className="flex justify-between items-start">
-            <span className="text-xs uppercase tracking-wide text-amber-600 dark:text-amber-400 font-bold">
-              {TYPE_LABEL[post.type]}
-              {post.profiles?.is_official ? " · Tienda/Admin" : ""}
-            </span>
-            {post.status === "VENDIDO" && (
-              <span className="text-xs bg-red-600 text-white px-2 py-0.5 rounded">VENDIDO</span>
-            )}
-          </div>
-          <h1 className="text-lg font-bold mt-1">{post.title}</h1>
-          {post.description && (
-            <p className="text-sm text-slate-600 dark:text-slate-300 mt-2">{post.description}</p>
-          )}
+          <h1 className="text-2xl leading-tight mt-2">{post.title}</h1>
           {post.price != null && (
-            <p className="text-amber-600 dark:text-amber-300 font-bold text-lg mt-2">
-              {formatCLP(post.price)}
-            </p>
+            <p className="text-2xl font-extrabold text-brand-text mt-2">{formatCLP(post.price)}</p>
+          )}
+          {post.description && (
+            <p className="text-sm text-muted mt-3 whitespace-pre-wrap">{post.description}</p>
           )}
           {post.trade_for && (
-            <p className="text-sm text-slate-600 dark:text-slate-300 mt-2">
-              🔁 Busca: {post.trade_for}
+            <p className="text-sm mt-3">
+              <span className="text-muted">Busca a cambio: </span>
+              {post.trade_for}
             </p>
           )}
-          <p className="text-xs text-slate-500 mt-3">
-            por {post.profiles?.username || "usuario"} · vence{" "}
+          <p className="text-xs text-muted mt-3">
+            @{post.profiles?.username || "usuario"} · vence{" "}
             {new Date(post.expires_at).toLocaleDateString("es-CL")}
           </p>
           {post.profiles?.phone && (
             <a
-              href={waLink(post.profiles.phone, post.title)}
+              href={waContactLink(post.profiles.phone, post.title)}
               target="_blank"
               rel="noopener noreferrer"
-              className="mt-3 inline-block text-sm bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded font-semibold"
+              className="btn btn-primary w-full mt-4"
             >
-              📱 Contactar por WhatsApp
+              <MessageCircle size={16} /> {contactLabel(post.type)}
             </a>
           )}
         </div>

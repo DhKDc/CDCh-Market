@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { Download } from "lucide-react";
 import { APP_NAME } from "../lib/config";
 
 const DISMISS_KEY = "install-prompt-dismissed";
@@ -13,7 +14,6 @@ export default function InstallPrompt() {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    // Registra el service worker (requisito para poder instalar en Android).
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("/sw.js").catch(() => {});
     }
@@ -27,7 +27,6 @@ export default function InstallPrompt() {
       (navigator as any).standalone === true;
     if (dismissed || standalone) return;
 
-    // Android / Chrome: el navegador avisa cuando la app es instalable.
     const onBIP = (e: Event) => {
       e.preventDefault();
       setDeferred(e as BIPEvent);
@@ -35,7 +34,6 @@ export default function InstallPrompt() {
     };
     window.addEventListener("beforeinstallprompt", onBIP);
 
-    // iPhone / iPad (Safari): no hay evento, se muestran instrucciones.
     const ua = navigator.userAgent;
     const isIOS = /iphone|ipad|ipod/i.test(ua) || (ua.includes("Mac") && "ontouchend" in document);
     const isSafari = /safari/i.test(ua) && !/crios|fxios|edgios/i.test(ua);
@@ -70,31 +68,27 @@ export default function InstallPrompt() {
   if (!visible) return null;
 
   return (
-    <div className="fixed bottom-3 left-3 right-3 z-50 max-w-md mx-auto bg-white dark:bg-slate-800 border border-amber-500 rounded-xl shadow-lg p-3 text-sm">
-      <p className="font-semibold">📲 Instala {APP_NAME}</p>
+    <div className="fixed bottom-28 left-3 right-3 z-50 max-w-md mx-auto card p-4 shadow-lg shadow-black/40">
+      <p className="font-bold flex items-center gap-2">
+        <Download size={18} className="text-brand-text" /> Instala {APP_NAME}
+      </p>
       {showIOS ? (
-        <p className="text-slate-600 dark:text-slate-300 mt-1">
-          Toca el botón <b>Compartir</b> (el cuadrado con la flecha) y luego{" "}
-          <b>“Agregar a pantalla de inicio”</b> para tenerla como app.
+        <p className="text-sm text-muted mt-1">
+          Toca el botón <b className="text-fg">Compartir</b> (el cuadrado con la flecha) y luego{" "}
+          <b className="text-fg">“Agregar a pantalla de inicio”</b> para tenerla como app.
         </p>
       ) : (
-        <p className="text-slate-600 dark:text-slate-300 mt-1">
+        <p className="text-sm text-muted mt-1">
           Ábrela directo desde tu pantalla de inicio, sin buscarla en el navegador.
         </p>
       )}
-      <div className="flex gap-2 mt-2">
+      <div className="flex gap-2 mt-3">
         {deferred && (
-          <button
-            onClick={install}
-            className="flex-1 bg-amber-500 hover:bg-amber-400 text-slate-900 font-semibold rounded py-1.5"
-          >
+          <button onClick={install} className="btn btn-primary flex-1">
             Instalar
           </button>
         )}
-        <button
-          onClick={dismiss}
-          className="flex-1 bg-slate-200 dark:bg-slate-700 rounded py-1.5"
-        >
+        <button onClick={dismiss} className="btn flex-1">
           {showIOS ? "Entendido" : "Ahora no"}
         </button>
       </div>

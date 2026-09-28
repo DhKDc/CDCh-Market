@@ -3,20 +3,18 @@ import { useEffect, useState, useCallback } from "react";
 import { supabase, Profile, Post } from "../../lib/supabase";
 import { COMMUNITY_NAME, WHATSAPP_GROUP_LINK } from "../../lib/config";
 import { displayPhone } from "../../lib/format";
+import { TYPE_LABEL, isSale, isTrade } from "../../lib/postTypes";
 import ThemeToggle from "../../components/ThemeToggle";
+import AdminAnnouncements from "../../components/AdminAnnouncements";
+import { ArrowLeft, MessageCircle, KeyRound, Pencil, Trash2, RefreshCw } from "lucide-react";
 
-const TYPE_LABEL: Record<string, string> = {
-  VENTA: "Venta",
-  PERMUTA: "Permuta",
-  BUSCO: "Busco",
-};
 
 export default function AdminPage() {
   const [me, setMe] = useState<Profile | null | undefined>(undefined);
   const [pendientes, setPendientes] = useState<Profile[]>([]);
   const [todos, setTodos] = useState<Profile[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
-  const [tab, setTab] = useState<"pendientes" | "todos" | "publicaciones">("pendientes");
+  const [tab, setTab] = useState<"pendientes" | "todos" | "publicaciones" | "novedades">("pendientes");
   const [resetInfo, setResetInfo] = useState<{ username: string; phone: string | null; password: string } | null>(null);
   const [justApproved, setJustApproved] = useState<Profile | null>(null);
   const [resetErr, setResetErr] = useState<string | null>(null);
@@ -109,7 +107,7 @@ export default function AdminPage() {
   if (me === undefined) return null;
   if (!me?.is_admin) {
     return (
-      <p className="text-center mt-20 text-slate-500 dark:text-slate-400">
+      <p className="text-center mt-20 text-muted">
         No tienes acceso a esta página.
       </p>
     );
@@ -117,48 +115,39 @@ export default function AdminPage() {
 
   const lista = tab === "pendientes" ? pendientes : todos;
 
+  const TABS: { key: typeof tab; label: string }[] = [
+    { key: "pendientes", label: `Pendientes (${pendientes.length})` },
+    { key: "todos", label: "Usuarios" },
+    { key: "publicaciones", label: `Publicaciones (${posts.length})` },
+    { key: "novedades", label: "Novedades" },
+  ];
+
   return (
-    <div className="max-w-3xl mx-auto p-4">
-      <div className="flex justify-between items-center mb-4">
-        <h1 className="text-lg font-bold">Panel de administración</h1>
-        <div className="flex items-center gap-3">
-          <ThemeToggle />
-          <a href="/" className="text-sm text-slate-500 dark:text-slate-400 underline">
-            Volver al market
-          </a>
-        </div>
+    <div className="max-w-3xl mx-auto px-4 pt-4 pb-12">
+      <div className="flex items-center justify-between mb-6">
+        <a href="/" className="btn btn-outline">
+          <ArrowLeft size={16} /> Volver
+        </a>
+        <ThemeToggle />
       </div>
-      <div className="flex gap-2 mb-4 flex-wrap">
-        <button
-          onClick={() => setTab("pendientes")}
-          className={`px-3 py-1 rounded-full text-sm ${
-            tab === "pendientes" ? "bg-amber-500 text-slate-900 font-semibold" : "bg-slate-200 dark:bg-slate-800"
-          }`}
-        >
-          Pendientes ({pendientes.length})
-        </button>
-        <button
-          onClick={() => setTab("todos")}
-          className={`px-3 py-1 rounded-full text-sm ${
-            tab === "todos" ? "bg-amber-500 text-slate-900 font-semibold" : "bg-slate-200 dark:bg-slate-800"
-          }`}
-        >
-          Usuarios
-        </button>
-        <button
-          onClick={() => setTab("publicaciones")}
-          className={`px-3 py-1 rounded-full text-sm ${
-            tab === "publicaciones" ? "bg-amber-500 text-slate-900 font-semibold" : "bg-slate-200 dark:bg-slate-800"
-          }`}
-        >
-          Publicaciones ({posts.length})
-        </button>
+      <h1 className="page-title mb-5">Admin</h1>
+
+      <div className="segmented mb-5 overflow-x-auto no-scrollbar">
+        {TABS.map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            className={`seg-item whitespace-nowrap px-4 text-sm ${tab === t.key ? "seg-item-on" : ""}`}
+          >
+            {t.label}
+          </button>
+        ))}
       </div>
 
-      {tab !== "publicaciones" && (
-        <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
-          Revisa que cada teléfono esté en tu{" "}
-          <a href={WHATSAPP_GROUP_LINK} target="_blank" rel="noopener noreferrer" className="underline text-green-600 dark:text-green-400">
+      {(tab === "pendientes" || tab === "todos") && (
+        <p className="text-xs text-muted mb-3">
+          Revisa que cada teléfono esté en la{" "}
+          <a href={WHATSAPP_GROUP_LINK} target="_blank" rel="noopener noreferrer" className="text-brand-text font-semibold underline">
             lista del grupo {COMMUNITY_NAME}
           </a>{" "}
           antes de aprobar.
@@ -166,34 +155,28 @@ export default function AdminPage() {
       )}
 
       {justApproved && (
-        <div className="mb-3 p-3 rounded-lg border border-emerald-500 bg-emerald-500/10 text-sm flex flex-wrap items-center gap-2">
+        <div className="card border-brand p-3 mb-3 flex flex-wrap items-center gap-2 text-sm">
           <span>
-            ✅ <b>{justApproved.username}</b> aprobado.
+            <b>{justApproved.username}</b> aprobado.
           </span>
           {justApproved.phone && (
-            <button
-              onClick={() => notifyApproved(justApproved)}
-              className="text-xs bg-green-600 hover:bg-green-500 text-white px-3 py-1 rounded font-semibold"
-            >
-              📱 Avisarle por WhatsApp
+            <button onClick={() => notifyApproved(justApproved)} className="btn btn-primary !py-1.5">
+              <MessageCircle size={15} /> Avisarle por WhatsApp
             </button>
           )}
-          <button
-            onClick={() => setJustApproved(null)}
-            className="text-xs bg-slate-200 dark:bg-slate-700 px-3 py-1 rounded"
-          >
+          <button onClick={() => setJustApproved(null)} className="btn !py-1.5">
             Cerrar
           </button>
         </div>
       )}
-      {resetErr && <p className="text-sm text-red-500 mb-3">{resetErr}</p>}
+      {resetErr && <p className="text-sm text-flame mb-3">{resetErr}</p>}
       {resetInfo && (
-        <div className="mb-3 p-3 rounded-lg border border-amber-500 bg-amber-500/10 text-sm">
+        <div className="card border-brand p-3 mb-3 text-sm">
           <p>
             Contraseña temporal de <b>{resetInfo.username}</b>:{" "}
             <code className="font-mono font-bold select-all">{resetInfo.password}</code>
           </p>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+          <p className="text-xs text-muted mt-1">
             Solo se muestra ahora. Envíasela por WhatsApp y pídele que la cambie.
           </p>
           <div className="flex gap-2 mt-2">
@@ -204,95 +187,63 @@ export default function AdminPage() {
                   `Hola ${resetInfo.username}! Tu contraseña temporal en Culture Diecast Chile Market es: ${resetInfo.password} (usuario: ${resetInfo.username}). Entra en ${window.location.origin}`
                 )
               }
-              className="text-xs bg-green-600 hover:bg-green-500 text-white px-3 py-1 rounded font-semibold"
+              className="btn btn-primary !py-1.5"
             >
-              📱 Enviar por WhatsApp
+              <MessageCircle size={15} /> Enviar por WhatsApp
             </button>
-            <button
-              onClick={() => setResetInfo(null)}
-              className="text-xs bg-slate-200 dark:bg-slate-700 px-3 py-1 rounded"
-            >
+            <button onClick={() => setResetInfo(null)} className="btn !py-1.5">
               Cerrar
             </button>
           </div>
         </div>
       )}
 
-      {tab !== "publicaciones" && (
+      {(tab === "pendientes" || tab === "todos") && (
         <div className="flex flex-col gap-2">
           {lista.map((p) => (
-            <div
-              key={p.id}
-              className="bg-white dark:bg-slate-800 rounded-lg p-3 border border-slate-200 dark:border-transparent flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2"
-            >
+            <div key={p.id} className="card p-3 flex flex-col gap-3">
               <div>
-                <p className="font-semibold">
+                <p className="font-bold">
                   {p.username}
-                  {p.is_official && (
-                    <span className="ml-2 text-[10px] bg-amber-500 text-slate-900 px-1.5 py-0.5 rounded font-bold">
-                      TIENDA/ADMIN GRUPO
-                    </span>
-                  )}
-                  {p.is_admin && (
-                    <span className="ml-2 text-[10px] bg-purple-600 text-white px-1.5 py-0.5 rounded font-bold">
-                      ADMIN DEL SITIO
-                    </span>
-                  )}
+                  {p.is_official && <span className="chip-blue ml-2">Tienda / admin grupo</span>}
+                  {p.is_admin && <span className="chip-flame ml-2">Admin sitio</span>}
                 </p>
-                <p className="text-sm text-amber-600 dark:text-amber-300">{p.phone ? displayPhone(p.phone) : "sin teléfono"}</p>
-                <p className="text-xs text-slate-500">
+                <p className="text-sm text-brand-text font-semibold">
+                  {p.phone ? displayPhone(p.phone) : "sin teléfono"}
+                </p>
+                <p className="text-xs text-muted">
                   {p.status} · registrado {new Date(p.created_at).toLocaleDateString("es-CL")}
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
                 {p.status !== "APROBADO" && (
-                  <button
-                    onClick={() => approve(p)}
-                    className="text-xs bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1 rounded"
-                  >
+                  <button onClick={() => approve(p)} className="btn btn-primary !py-1.5">
                     Aprobar
                   </button>
                 )}
                 {p.status !== "RECHAZADO" && (
-                  <button
-                    onClick={() => setStatus(p.id, "RECHAZADO")}
-                    className="text-xs bg-red-600 hover:bg-red-500 text-white px-3 py-1 rounded"
-                  >
+                  <button onClick={() => setStatus(p.id, "RECHAZADO")} className="btn btn-danger !py-1.5">
                     Rechazar
                   </button>
                 )}
-                <button
-                  onClick={() => toggleFlag(p, "is_official")}
-                  className="text-xs bg-slate-200 dark:bg-slate-700 px-3 py-1 rounded"
-                >
+                <button onClick={() => toggleFlag(p, "is_official")} className="btn !py-1.5">
                   {p.is_official ? "Quitar tienda/admin grupo" : "Marcar tienda/admin grupo"}
                 </button>
-                <button
-                  onClick={() => toggleFlag(p, "is_admin")}
-                  className="text-xs bg-slate-200 dark:bg-slate-700 px-3 py-1 rounded"
-                >
+                <button onClick={() => toggleFlag(p, "is_admin")} className="btn !py-1.5">
                   {p.is_admin ? "Quitar admin del sitio" : "Hacer admin del sitio"}
                 </button>
                 {p.status === "APROBADO" && p.phone && (
-                  <button
-                    onClick={() => notifyApproved(p)}
-                    className="text-xs bg-green-600 hover:bg-green-500 text-white px-3 py-1 rounded font-semibold"
-                  >
-                    📱 Avisar aprobación
+                  <button onClick={() => notifyApproved(p)} className="btn btn-outline !py-1.5">
+                    <MessageCircle size={15} /> Avisar aprobación
                   </button>
                 )}
-                <button
-                  onClick={() => resetPassword(p)}
-                  className="text-xs bg-slate-200 dark:bg-slate-700 px-3 py-1 rounded"
-                >
-                  🔑 Resetear contraseña
+                <button onClick={() => resetPassword(p)} className="btn btn-outline !py-1.5">
+                  <KeyRound size={15} /> Resetear contraseña
                 </button>
               </div>
             </div>
           ))}
-          {lista.length === 0 && (
-            <p className="text-slate-500 text-center mt-6">Nada por aquí.</p>
-          )}
+          {lista.length === 0 && <p className="text-muted text-center mt-6">Nada por aquí.</p>}
         </div>
       )}
 
@@ -301,11 +252,11 @@ export default function AdminPage() {
           {posts.map((p) => (
             <AdminPostRow key={p.id} post={p} onChanged={load} />
           ))}
-          {posts.length === 0 && (
-            <p className="text-slate-500 text-center mt-6">No hay publicaciones.</p>
-          )}
+          {posts.length === 0 && <p className="text-muted text-center mt-6">No hay publicaciones.</p>}
         </div>
       )}
+
+      {tab === "novedades" && <AdminAnnouncements userId={me.id} />}
     </div>
   );
 }
@@ -332,6 +283,12 @@ function AdminPostRow({ post: p, onChanged }: { post: Post; onChanged: () => voi
     onChanged();
   }
 
+  async function renew() {
+    const expires_at = new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString();
+    await supabase.from("posts").update({ expires_at }).eq("id", p.id);
+    onChanged();
+  }
+
   async function saveEdit(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
@@ -340,8 +297,8 @@ function AdminPostRow({ post: p, onChanged }: { post: Post; onChanged: () => voi
       .update({
         title,
         description: description || null,
-        price: price ? Number(price) : null,
-        trade_for: p.type === "PERMUTA" ? tradeFor || null : p.trade_for,
+        price: isSale(p.type) && price ? Number(price) : null,
+        trade_for: isTrade(p.type) ? tradeFor || null : null,
       })
       .eq("id", p.id);
     setSaving(false);
@@ -351,49 +308,20 @@ function AdminPostRow({ post: p, onChanged }: { post: Post; onChanged: () => voi
 
   if (editing) {
     return (
-      <form
-        onSubmit={saveEdit}
-        className="bg-white dark:bg-slate-800 rounded-lg p-3 flex flex-col gap-2 border border-amber-500"
-      >
-        <input
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          className="bg-slate-100 dark:bg-slate-900 rounded px-2 py-1"
-        />
-        <textarea
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          className="bg-slate-100 dark:bg-slate-900 rounded px-2 py-1"
-        />
-        {p.type === "VENTA" && (
-          <input
-            type="number"
-            value={price}
-            onChange={(e) => setPrice(e.target.value)}
-            placeholder="Precio"
-            className="bg-slate-100 dark:bg-slate-900 rounded px-2 py-1"
-          />
+      <form onSubmit={saveEdit} className="card border-brand p-3 flex flex-col gap-2">
+        <input value={title} onChange={(e) => setTitle(e.target.value)} className="input" required />
+        <textarea value={description} onChange={(e) => setDescription(e.target.value)} className="input" rows={3} />
+        {isSale(p.type) && (
+          <input type="number" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="Precio" className="input" />
         )}
-        {p.type === "PERMUTA" && (
-          <input
-            value={tradeFor}
-            onChange={(e) => setTradeFor(e.target.value)}
-            placeholder="¿Qué busca a cambio?"
-            className="bg-slate-100 dark:bg-slate-900 rounded px-2 py-1"
-          />
+        {isTrade(p.type) && (
+          <input value={tradeFor} onChange={(e) => setTradeFor(e.target.value)} placeholder="¿Qué busca a cambio?" className="input" />
         )}
         <div className="flex gap-2">
-          <button
-            disabled={saving}
-            className="flex-1 bg-amber-500 hover:bg-amber-400 text-slate-900 font-semibold rounded py-1 text-sm"
-          >
+          <button disabled={saving} className="btn btn-primary flex-1">
             {saving ? "Guardando..." : "Guardar"}
           </button>
-          <button
-            type="button"
-            onClick={() => setEditing(false)}
-            className="flex-1 bg-slate-200 dark:bg-slate-700 rounded py-1 text-sm"
-          >
+          <button type="button" onClick={() => setEditing(false)} className="btn flex-1">
             Cancelar
           </button>
         </div>
@@ -402,36 +330,29 @@ function AdminPostRow({ post: p, onChanged }: { post: Post; onChanged: () => voi
   }
 
   return (
-    <div className="bg-white dark:bg-slate-800 rounded-lg p-3 border border-slate-200 dark:border-transparent flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
+    <div className="card p-3 flex flex-col gap-3">
       <div>
-        <p className="text-xs uppercase tracking-wide text-amber-600 dark:text-amber-400 font-bold">
-          {TYPE_LABEL[p.type]}
-          {p.status === "VENDIDO" ? " · VENDIDO" : ""}
-        </p>
-        <p className="font-semibold">{p.title}</p>
-        <p className="text-xs text-slate-500">
-          por {p.profiles?.username || "usuario"} · vence{" "}
-          {new Date(p.expires_at).toLocaleDateString("es-CL")}
+        <div className="flex flex-wrap gap-1.5 mb-1">
+          <span className="chip-blue">{TYPE_LABEL[p.type]}</span>
+          {p.status === "VENDIDO" && <span className="chip-flame">Vendido</span>}
+        </div>
+        <p className="font-bold leading-tight">{p.title}</p>
+        <p className="text-xs text-muted">
+          @{p.profiles?.username || "usuario"} · vence {new Date(p.expires_at).toLocaleDateString("es-CL")}
         </p>
       </div>
       <div className="flex flex-wrap gap-2">
-        <button
-          onClick={toggleSold}
-          className="text-xs bg-slate-200 dark:bg-slate-700 px-3 py-1 rounded"
-        >
+        <button onClick={toggleSold} className="btn !py-1.5">
           {p.status === "ACTIVA" ? "Marcar vendido" : "Reactivar"}
         </button>
-        <button
-          onClick={() => setEditing(true)}
-          className="text-xs bg-slate-200 dark:bg-slate-700 px-3 py-1 rounded"
-        >
-          ✏️ Editar
+        <button onClick={renew} className="btn btn-outline !py-1.5">
+          <RefreshCw size={15} /> Renovar 7 días
         </button>
-        <button
-          onClick={remove}
-          className="text-xs bg-red-600/10 text-red-600 dark:text-red-400 px-3 py-1 rounded"
-        >
-          🗑️ Eliminar
+        <button onClick={() => setEditing(true)} className="btn btn-outline !py-1.5">
+          <Pencil size={15} /> Editar
+        </button>
+        <button onClick={remove} className="btn btn-danger !py-1.5">
+          <Trash2 size={15} /> Eliminar
         </button>
       </div>
     </div>
