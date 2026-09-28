@@ -41,7 +41,7 @@ create table posts (
 -- (ver lib/config.ts), así que el username real se manda en raw_user_meta_data.
 create or replace function handle_new_user() returns trigger as $$
 begin
-  insert into profiles (id, username, phone)
+  insert into public.profiles (id, username, phone)
     values (
       new.id,
       coalesce(new.raw_user_meta_data ->> 'username', split_part(new.email, '@', 1)),
@@ -49,7 +49,7 @@ begin
     );
   return new;
 end;
-$$ language plpgsql security definer;
+$$ language plpgsql security definer set search_path = public;
 
 create trigger on_auth_user_created
   after insert on auth.users
@@ -60,14 +60,14 @@ create trigger on_auth_user_created
 -- puede hacer el propio dueño del perfil.
 create or replace function protect_profile_fields() returns trigger as $$
 begin
-  if not exists (select 1 from profiles where id = auth.uid() and is_admin) then
+  if not exists (select 1 from public.profiles where id = auth.uid() and is_admin) then
     new.status := old.status;
     new.is_admin := old.is_admin;
     new.is_official := old.is_official;
   end if;
   return new;
 end;
-$$ language plpgsql security definer;
+$$ language plpgsql security definer set search_path = public;
 
 create trigger trg_protect_profile_fields
   before update on profiles
@@ -84,11 +84,11 @@ create trigger trg_protect_profile_fields
 create or replace function check_post_rules() returns trigger as $$
 declare
   es_oficial boolean;
-  estado_perfil profile_status;
+  estado_perfil public.profile_status;
   ventas_24h int;
 begin
   select is_official, status into es_oficial, estado_perfil
-    from profiles where id = new.user_id;
+    from public.profiles where id = new.user_id;
 
   if estado_perfil is distinct from 'APROBADO' then
     raise exception 'Tu cuenta debe ser aprobada por un administrador antes de publicar';
@@ -99,7 +99,7 @@ begin
   end if;
 
   if new.type = 'VENTA' and not coalesce(es_oficial, false) then
-    select count(*) into ventas_24h from posts
+    select count(*) into ventas_24h from public.posts
       where user_id = new.user_id
         and type = 'VENTA'
         and created_at > now() - interval '24 hours';
@@ -114,7 +114,7 @@ begin
 
   return new;
 end;
-$$ language plpgsql security definer;
+$$ language plpgsql security definer set search_path = public;
 
 create trigger trg_check_post_rules
   before insert on posts

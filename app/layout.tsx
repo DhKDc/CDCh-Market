@@ -1,8 +1,26 @@
 import "./globals.css";
+import type { Metadata, Viewport } from "next";
+import InstallPrompt from "../components/InstallPrompt";
 
-export const metadata = {
-  title: "Diecast Chile Market",
-  description: "Ventas, permutas y expos de la comunidad Diecast Chile",
+export const metadata: Metadata = {
+  title: "Culture Diecast Chile Market",
+  description: "Ventas, permutas y búsquedas de la comunidad Culture Diecast Chile",
+  applicationName: "Culture Diecast Chile Market",
+  appleWebApp: {
+    capable: true,
+    title: "CDC Market",
+    statusBarStyle: "default",
+  },
+  icons: {
+    icon: "/icons/icon-192.png",
+    apple: "/icons/apple-touch-icon.png",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#f59e0b",
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -22,7 +40,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           }}
         />
       </head>
-      <body>{children}</body>
+      <body>
+        {children}
+        <InstallPrompt />
+      </body>
     </html>
   );
 }

@@ -23,3 +23,6 @@ export function usernameToSyntheticEmail(username: string): string {
   return `${usernameToSlug(username)}@${AUTH_EMAIL_DOMAIN}`;
 }
 
+
+export const APP_NAME = "Culture Diecast Chile Market";
+export const APP_SHORT_NAME = "CDC Market";

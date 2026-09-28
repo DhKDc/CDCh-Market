@@ -84,7 +84,7 @@ export default function AdminPage() {
   function notifyApproved(p: Profile) {
     waTo(
       p.phone,
-      `Hola ${p.username}! Ya aprobé tu cuenta en Diecast Chile Market 🚗 Puedes entrar y publicar aquí: ${window.location.origin}`
+      `Hola ${p.username}! Ya aprobé tu cuenta en Culture Diecast Chile Market 🚗 Puedes entrar y publicar aquí: ${window.location.origin}`
     );
   }
 
@@ -201,7 +201,7 @@ export default function AdminPage() {
               onClick={() =>
                 waTo(
                   resetInfo.phone,
-                  `Hola ${resetInfo.username}! Tu contraseña temporal en Diecast Chile Market es: ${resetInfo.password} (usuario: ${resetInfo.username}). Entra en ${window.location.origin}`
+                  `Hola ${resetInfo.username}! Tu contraseña temporal en Culture Diecast Chile Market es: ${resetInfo.password} (usuario: ${resetInfo.username}). Entra en ${window.location.origin}`
                 )
               }
               className="text-xs bg-green-600 hover:bg-green-500 text-white px-3 py-1 rounded font-semibold"

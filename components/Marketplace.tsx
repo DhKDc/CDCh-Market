@@ -46,7 +46,7 @@ async function uploadPhotos(userId: string, files: File[]): Promise<string[]> {
 function waLink(phone: string, title: string) {
   const digits = phone.replace(/\D/g, "");
   const text = encodeURIComponent(
-    `Hola! Vi tu publicación "${title}" en Diecast Chile Market 🚗`
+    `Hola! Vi tu publicación "${title}" en Culture Diecast Chile Market 🚗`
   );
   return `https://wa.me/${digits}?text=${text}`;
 }
@@ -141,7 +141,7 @@ export default function Marketplace({
   return (
     <div className="max-w-6xl mx-auto p-4">
       <div className="flex justify-between items-center mb-4">
-        <h1 className="text-lg font-bold">🚗 Diecast Chile Market</h1>
+        <h1 className="text-base sm:text-lg font-bold leading-tight">🚗 Culture Diecast Chile Market</h1>
         <div className="flex items-center gap-3">
           <ThemeToggle />
           {isAdmin && (
@@ -282,7 +282,7 @@ function PostCard({
 
   async function share() {
     const url = `${window.location.origin}/post/${p.id}`;
-    const text = `Mira esta publicación en Diecast Chile Market: "${p.title}"`;
+    const text = `Mira esta publicación en Culture Diecast Chile Market: "${p.title}"`;
     if (navigator.share) {
       try {
         await navigator.share({ title: p.title, text, url });

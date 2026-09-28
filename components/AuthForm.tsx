@@ -59,9 +59,9 @@ export default function AuthForm() {
       <div className="absolute top-3 right-3">
         <ThemeToggle />
       </div>
-      <h1 className="text-xl font-bold mb-1 text-center">Diecast Chile Market</h1>
+      <h1 className="text-xl font-bold mb-1 text-center">Culture Diecast Chile Market</h1>
       <p className="text-xs text-slate-500 dark:text-slate-400 text-center mb-4">
-        Comunidad {COMMUNITY_NAME}
+        Compra, vende y permuta con la comunidad
       </p>
       <form onSubmit={submit} className="flex flex-col gap-3">
         <input

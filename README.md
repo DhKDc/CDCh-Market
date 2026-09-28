@@ -1,4 +1,4 @@
-# Diecast Chile Market
+# Culture Diecast Chile Market
 
 Web app para la comunidad Culture Diecast Chile: ventas, permutas y "busco" de
 carritos, reemplazando el descontrol de WhatsApp. (Cacería y Expo quedan solo en
@@ -70,6 +70,9 @@ SQL Editor, en orden, las migraciones que aún no hayas corrido:
 4. `migration-5-tipos-fotos-username.sql` (quita cacería/expo y borra sus publicaciones
    existentes, pasa a multi-foto, username único)
 
+5. `migration-6-fix-signup-trigger.sql` (**arregla el error 500 al registrarse**: 
+   `relation "profiles" does not exist`; al final devuelve `profiles` si la tabla existe)
+
 Y luego, en Supabase: **Authentication → Providers → Email → desactiva "Confirm email"**.
 Después haz push al repo y Vercel redeploya.
 
@@ -84,3 +87,14 @@ y pedirles que se registren otra vez).
   resolvía en el build de Vercel.
 - Las fotos se comprimen en el navegador antes de subirse.
 - Formatos comunes en `lib/format.ts` (pesos chilenos, teléfono `+56 9 XXXX XXXX`).
+
+## Instalar como app (PWA)
+La app se puede instalar en el celular sin pasar por tiendas:
+- **Android (Chrome)**: la primera vez aparece un aviso "Instala Culture Diecast Chile
+  Market" con botón *Instalar*. También sirve el menú ⋮ → "Instalar app".
+- **iPhone (Safari)**: iOS no permite el aviso automático; la app muestra las
+  instrucciones (Compartir → "Agregar a pantalla de inicio"). Solo funciona desde Safari.
+- El aviso sale una vez; si lo cierras no vuelve. Para verlo de nuevo, borra los datos del sitio.
+- Requiere HTTPS (Vercel ya lo da). Íconos en `public/icons/`, manifest en `app/manifest.ts`.
+- El service worker (`public/sw.js`) no guarda nada en caché a propósito: las
+  publicaciones y fotos siempre se cargan frescas, así que no funciona sin internet.

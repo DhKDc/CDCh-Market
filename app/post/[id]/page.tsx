@@ -14,7 +14,7 @@ const TYPE_LABEL: Record<string, string> = {
 function waLink(phone: string, title: string) {
   const digits = phone.replace(/\D/g, "");
   const text = encodeURIComponent(
-    `Hola! Vi tu publicación "${title}" en Diecast Chile Market 🚗`
+    `Hola! Vi tu publicación "${title}" en Culture Diecast Chile Market 🚗`
   );
   return `https://wa.me/${digits}?text=${text}`;
 }
@@ -45,7 +45,7 @@ export default function PostDetailPage() {
           Puede que ya haya expirado, se haya eliminado, o que necesites iniciar sesión para verla.
         </p>
         <a href="/" className="text-amber-600 dark:text-amber-400 underline">
-          Ir a Diecast Chile Market
+          Ir a Culture Diecast Chile Market
         </a>
       </div>
     );
