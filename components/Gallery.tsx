@@ -1,7 +1,7 @@
 "use client";
 import { useRef, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-
+ 
 // Galería con deslizar entre fotos (scroll-snap nativo) y zoom con pellizco
 // directamente sobre la foto activa (touch-action: pinch-zoom, sin overlay
 // aparte): se hace zoom y se puede seguir deslizando a la otra foto sin
@@ -17,7 +17,7 @@ export default function Gallery({
 }) {
   const scroller = useRef<HTMLDivElement>(null);
   const [index, setIndex] = useState(0);
-
+ 
   if (!urls || urls.length === 0) {
     return (
       <div className={`photo-tile ${ratio} grid place-items-center text-sm text-neutral-500`}>
@@ -25,19 +25,19 @@ export default function Gallery({
       </div>
     );
   }
-
+ 
   function onScroll() {
     const el = scroller.current;
     if (!el) return;
     setIndex(Math.round(el.scrollLeft / el.clientWidth));
   }
-
+ 
   function go(dir: number) {
     const el = scroller.current;
     if (!el) return;
     el.scrollTo({ left: el.clientWidth * (index + dir), behavior: "smooth" });
   }
-
+ 
   return (
     <div className="relative">
       <div
@@ -52,12 +52,12 @@ export default function Gallery({
             src={u}
             alt={`${alt} ${i + 1}/${urls.length}`}
             className="w-full h-full object-contain shrink-0 snap-center select-none"
-            style={{ touchAction: "pinch-zoom" }}
+            style={{ touchAction: "pan-x pinch-zoom" }}
             draggable={false}
           />
         ))}
       </div>
-
+ 
       {urls.length > 1 && (
         <>
           <div className="hidden sm:block">
