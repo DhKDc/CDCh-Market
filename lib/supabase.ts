@@ -14,12 +14,11 @@ export type Profile = {
   username: string;
   phone: string | null;
   status: ProfileStatus;
-  is_official: boolean;
   is_admin: boolean;
   created_at: string;
 };
 
-export type PostProfile = { username: string; is_official: boolean; phone: string | null };
+export type PostProfile = { username: string; is_admin: boolean; phone: string | null };
 
 export type Post = {
   id: string;
@@ -41,6 +40,7 @@ export type AnnouncementKind = "NOVEDAD" | "PROXIMAMENTE" | "PREVENTA" | "RIFA";
 export type Announcement = {
   id: string;
   author_id: string;
+  author_username?: string;
   kind: AnnouncementKind;
   title: string;
   body: string | null;

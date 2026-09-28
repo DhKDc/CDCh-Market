@@ -33,7 +33,7 @@ export default function AdminPage() {
     setTodos((t as Profile[]) || []);
     const { data: posts } = await supabase
       .from("posts")
-      .select("*, profiles(username, is_official, phone)")
+      .select("*, profiles(username, is_admin, phone)")
       .order("created_at", { ascending: false });
     setPosts((posts as any) || []);
   }, []);
@@ -64,11 +64,11 @@ export default function AdminPage() {
     setJustApproved(p);
   }
 
-  async function toggleFlag(p: Profile, field: "is_official" | "is_admin") {
-    if (field === "is_admin" && p.id === me?.id && p.is_admin) {
-      if (!confirm("Te vas a quitar el permiso de admin del sitio a ti mismo. ¿Continuar?")) return;
+  async function toggleAdmin(p: Profile) {
+    if (p.id === me?.id && p.is_admin) {
+      if (!confirm("Te vas a quitar el rol de admin a ti mismo. ¿Continuar?")) return;
     }
-    await supabase.from("profiles").update({ [field]: !p[field] }).eq("id", p.id);
+    await supabase.from("profiles").update({ is_admin: !p.is_admin }).eq("id", p.id);
     load();
   }
 
@@ -205,8 +205,7 @@ export default function AdminPage() {
               <div>
                 <p className="font-bold">
                   {p.username}
-                  {p.is_official && <span className="chip-blue ml-2">Tienda / admin grupo</span>}
-                  {p.is_admin && <span className="chip-flame ml-2">Admin sitio</span>}
+                  {p.is_admin && <span className="chip-flame ml-2">Admin / tienda oficial</span>}
                 </p>
                 <p className="text-sm text-brand-text font-semibold">
                   {p.phone ? displayPhone(p.phone) : "sin teléfono"}
@@ -226,11 +225,8 @@ export default function AdminPage() {
                     Rechazar
                   </button>
                 )}
-                <button onClick={() => toggleFlag(p, "is_official")} className="btn !py-1.5">
-                  {p.is_official ? "Quitar tienda/admin grupo" : "Marcar tienda/admin grupo"}
-                </button>
-                <button onClick={() => toggleFlag(p, "is_admin")} className="btn !py-1.5">
-                  {p.is_admin ? "Quitar admin del sitio" : "Hacer admin del sitio"}
+                <button onClick={() => toggleAdmin(p)} className="btn !py-1.5">
+                  {p.is_admin ? "Quitar admin / tienda oficial" : "Hacer admin / tienda oficial"}
                 </button>
                 {p.status === "APROBADO" && p.phone && (
                   <button onClick={() => notifyApproved(p)} className="btn btn-outline !py-1.5">

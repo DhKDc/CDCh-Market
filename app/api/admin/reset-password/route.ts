@@ -30,11 +30,18 @@ export async function POST(req: Request) {
   // 1) Verifica en el servidor que quien llama es admin del sitio.
   const { data: userData } = await admin.auth.getUser(token);
   if (!userData?.user) return NextResponse.json({ error: "Sesión inválida." }, { status: 401 });
-  const { data: caller } = await admin
+  const { data: caller, error: callerErr } = await admin
     .from("profiles")
     .select("is_admin")
     .eq("id", userData.user.id)
     .single();
+  if (callerErr) {
+    // No enmascares un error de permisos/config como "No autorizado": son cosas distintas.
+    return NextResponse.json(
+      { error: "Error de base de datos al verificar admin: " + callerErr.message },
+      { status: 500 }
+    );
+  }
   if (!caller?.is_admin) return NextResponse.json({ error: "No autorizado." }, { status: 403 });
 
   // 2) Genera y aplica una contraseña temporal.

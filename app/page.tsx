@@ -71,5 +71,5 @@ export default function Home() {
     );
   }
 
-  return <Marketplace userId={userId} isOfficial={profile.is_official} isAdmin={profile.is_admin} />;
+  return <Marketplace userId={userId} isAdmin={profile.is_admin} />;
 }

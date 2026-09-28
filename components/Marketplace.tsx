@@ -13,8 +13,8 @@ import { waContactLink } from "../lib/whatsapp";
 import { uploadPhotos, MAX_PHOTOS } from "../lib/photos";
 import ThemeToggle from "./ThemeToggle";
 import PhotoPicker from "./PhotoPicker";
-import PhotoStrip from "./PhotoStrip";
-import Featured from "./Featured";
+import Gallery from "./Gallery";
+import BottomNav from "./BottomNav";
 
 const FILTERS: { key: PostType | "TODAS"; label: string }[] = [
   { key: "TODAS", label: "Todas" },
@@ -25,15 +25,7 @@ const FILTERS: { key: PostType | "TODAS"; label: string }[] = [
 
 const isClosed = (p: Post) => p.status === "VENDIDO" || new Date(p.expires_at) < new Date();
 
-export default function Marketplace({
-  userId,
-  isOfficial,
-  isAdmin,
-}: {
-  userId: string;
-  isOfficial: boolean;
-  isAdmin: boolean;
-}) {
+export default function Marketplace({ userId, isAdmin }: { userId: string; isAdmin: boolean }) {
   const [posts, setPosts] = useState<Post[]>([]);
   const [filter, setFilter] = useState<PostType | "TODAS">("TODAS");
   const [search, setSearch] = useState("");
@@ -46,7 +38,7 @@ export default function Marketplace({
     setLoading(true);
     const { data } = await supabase
       .from("posts")
-      .select("*, profiles(username, is_official, phone)")
+      .select("*, profiles(username, is_admin, phone)")
       .order("created_at", { ascending: false });
     setPosts((data as any) || []);
     setLoading(false);
@@ -101,17 +93,11 @@ export default function Marketplace({
               <ShieldCheck size={18} />
             </a>
           )}
-          <button
-            onClick={() => supabase.auth.signOut()}
-            className="icon-btn"
-            aria-label="Salir"
-          >
+          <button onClick={() => supabase.auth.signOut()} className="icon-btn" aria-label="Salir">
             <LogOut size={18} />
           </button>
         </div>
       </header>
-
-      <Featured />
 
       <h1 className="page-title mb-5">Mercado</h1>
 
@@ -141,9 +127,7 @@ export default function Marketplace({
         <span className="text-muted mr-1">
           {visible.length} publicaci{visible.length === 1 ? "ón" : "ones"}
         </span>
-        {!(isOfficial || isAdmin) && (
-          <span className="pill text-xs font-semibold">Ventas hoy {ventasHoy}/3</span>
-        )}
+        {!isAdmin && <span className="pill text-xs font-semibold">Ventas hoy {ventasHoy}/3</span>}
         {closedCount > 0 && (
           <button
             onClick={() => setShowClosed(!showClosed)}
@@ -168,31 +152,21 @@ export default function Marketplace({
       <button
         onClick={() => setShowForm(true)}
         aria-label="Nueva publicación"
-        className="fixed bottom-6 right-5 z-30 w-16 h-16 rounded-full bg-brand text-white grid place-items-center shadow-lg shadow-black/40 active:scale-95 transition"
+        className="fixed bottom-24 right-5 z-30 w-16 h-16 rounded-full bg-brand text-white grid place-items-center shadow-lg shadow-black/40 active:scale-95 transition"
       >
         <Plus size={30} />
       </button>
 
       {showForm && (
-        <div
-          onClick={() => setShowForm(false)}
-          className="fixed inset-0 z-40 bg-black/70 overflow-y-auto"
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="card max-w-lg mx-auto my-6 p-4 relative"
-          >
-            <button
-              onClick={() => setShowForm(false)}
-              aria-label="Cerrar"
-              className="icon-btn absolute top-3 right-3"
-            >
+        <div onClick={() => setShowForm(false)} className="fixed inset-0 z-40 bg-black/70 overflow-y-auto">
+          <div onClick={(e) => e.stopPropagation()} className="card max-w-lg mx-auto my-6 p-4 relative">
+            <button onClick={() => setShowForm(false)} aria-label="Cerrar" className="icon-btn absolute top-3 right-3">
               <X size={18} />
             </button>
             <h2 className="text-2xl mb-4">Nueva publicación</h2>
             <PostForm
               userId={userId}
-              isOfficial={isOfficial || isAdmin}
+              isAdmin={isAdmin}
               onDone={() => {
                 setShowForm(false);
                 load();
@@ -201,6 +175,8 @@ export default function Marketplace({
           </div>
         </div>
       )}
+
+      <BottomNav />
     </div>
   );
 }
@@ -278,7 +254,7 @@ function PostCard({
   async function saveEdit(e: React.FormEvent) {
     e.preventDefault();
     setErr(null);
-    if (isSale(p.type) && !price && !p.profiles?.is_official) {
+    if (isSale(p.type) && !price && !isAdmin) {
       setErr("El precio es obligatorio en las ventas.");
       return;
     }
@@ -342,13 +318,7 @@ function PostCard({
             className="input"
           />
         )}
-        <PhotoPicker
-          existing={existing}
-          onExistingChange={setExisting}
-          files={newFiles}
-          onFilesChange={setNewFiles}
-          max={MAX_PHOTOS}
-        />
+        <PhotoPicker existing={existing} onExistingChange={setExisting} files={newFiles} onFilesChange={setNewFiles} max={MAX_PHOTOS} />
         {err && <p className="text-flame text-sm">{err}</p>}
         <div className="flex gap-2">
           <button disabled={saving} className="btn btn-primary flex-1">
@@ -371,9 +341,7 @@ function PostCard({
               // eslint-disable-next-line @next/next/no-img-element
               <img src={thumb} alt={p.title} className="w-full h-full object-contain" />
             ) : (
-              <div className="w-full h-full grid place-items-center text-sm text-neutral-500">
-                Sin foto
-              </div>
+              <div className="w-full h-full grid place-items-center text-sm text-neutral-500">Sin foto</div>
             )}
             {extra > 0 && (
               <span className="absolute bottom-2 right-2 bg-black/70 text-white text-xs font-semibold px-2 py-0.5 rounded-full">
@@ -381,19 +349,15 @@ function PostCard({
               </span>
             )}
             {p.status === "VENDIDO" && <span className="chip-flame absolute top-2 left-2">Vendido</span>}
-            {p.status === "ACTIVA" && expired && (
-              <span className="chip-flame absolute top-2 left-2">Vencida</span>
-            )}
+            {p.status === "ACTIVA" && expired && <span className="chip-flame absolute top-2 left-2">Vencida</span>}
           </div>
           <h3 className="text-[15px] leading-tight mt-3 line-clamp-2 min-h-[2.4em]">{p.title}</h3>
           <div className="flex flex-wrap items-center gap-1.5 mt-2">
             <span className="chip-blue">{TYPE_LABEL[p.type]}</span>
             {p.price != null && <span className="tagchip">{formatCLP(p.price)}</span>}
-            {p.profiles?.is_official && <span className="tagchip">Tienda</span>}
+            {p.profiles?.is_admin && <span className="tagchip">Tienda</span>}
           </div>
-          {p.trade_for && (
-            <p className="text-xs text-muted mt-2 line-clamp-2">Busca: {p.trade_for}</p>
-          )}
+          {p.trade_for && <p className="text-xs text-muted mt-2 line-clamp-2">Busca: {p.trade_for}</p>}
           <p className="text-xs text-muted mt-2">
             @{p.profiles?.username || "usuario"} · {expired ? "venció" : "vence"}{" "}
             {new Date(p.expires_at).toLocaleDateString("es-CL")}
@@ -402,12 +366,7 @@ function PostCard({
 
         <div className="mt-3 flex flex-col gap-2">
           {!isOwner && phone && (
-            <a
-              href={waContactLink(phone, p.title)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn btn-primary w-full"
-            >
+            <a href={waContactLink(phone, p.title)} target="_blank" rel="noopener noreferrer" className="btn btn-primary w-full">
               <MessageCircle size={16} /> Contactar
             </a>
           )}
@@ -417,18 +376,10 @@ function PostCard({
             </button>
           )}
           <div className="flex rounded-full border border-line overflow-hidden">
-            <button
-              onClick={share}
-              aria-label="Compartir"
-              className="flex-1 py-2.5 grid place-items-center"
-            >
+            <button onClick={share} aria-label="Compartir" className="flex-1 py-2.5 grid place-items-center">
               <Share2 size={17} />
             </button>
-            <button
-              onClick={() => setDetailOpen(true)}
-              aria-label="Ver detalle"
-              className="flex-1 py-2.5 grid place-items-center border-l border-line"
-            >
+            <button onClick={() => setDetailOpen(true)} aria-label="Ver detalle" className="flex-1 py-2.5 grid place-items-center border-l border-line">
               <ChevronRight size={18} />
             </button>
           </div>
@@ -436,36 +387,22 @@ function PostCard({
       </article>
 
       {detailOpen && (
-        <div
-          onClick={() => setDetailOpen(false)}
-          className="fixed inset-0 z-40 bg-black/70 flex items-center justify-center p-4"
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="card w-full max-w-lg max-h-[90vh] overflow-y-auto p-4 relative"
-          >
-            <button
-              onClick={() => setDetailOpen(false)}
-              aria-label="Cerrar"
-              className="icon-btn absolute top-3 right-3 z-10 !bg-black/70 text-white"
-            >
+        <div onClick={() => setDetailOpen(false)} className="fixed inset-0 z-40 bg-black/70 flex items-center justify-center p-4">
+          <div onClick={(e) => e.stopPropagation()} className="card w-full max-w-lg max-h-[90vh] overflow-y-auto p-4 relative">
+            <button onClick={() => setDetailOpen(false)} aria-label="Cerrar" className="icon-btn absolute top-3 right-3 z-10 !bg-black/70 text-white">
               <X size={18} />
             </button>
-            <PhotoStrip urls={p.photo_urls || []} alt={p.title} />
+            <Gallery urls={p.photo_urls || []} alt={p.title} ratio="aspect-square" />
             <div className="mt-3">
               <div className="flex flex-wrap items-center gap-1.5">
                 <span className="chip-blue">{TYPE_LABEL[p.type]}</span>
-                {p.profiles?.is_official && <span className="tagchip">Tienda</span>}
+                {p.profiles?.is_admin && <span className="tagchip">Tienda</span>}
                 {p.status === "VENDIDO" && <span className="chip-flame">Vendido</span>}
                 {p.status === "ACTIVA" && expired && <span className="chip-flame">Vencida</span>}
               </div>
               <h2 className="text-2xl leading-tight mt-2">{p.title}</h2>
-              {p.price != null && (
-                <p className="text-2xl font-extrabold text-brand-text mt-2">{formatCLP(p.price)}</p>
-              )}
-              {p.description && (
-                <p className="text-sm text-muted mt-3 whitespace-pre-wrap">{p.description}</p>
-              )}
+              {p.price != null && <p className="text-2xl font-extrabold text-brand-text mt-2">{formatCLP(p.price)}</p>}
+              {p.description && <p className="text-sm text-muted mt-3 whitespace-pre-wrap">{p.description}</p>}
               {p.trade_for && (
                 <p className="text-sm mt-3">
                   <span className="text-muted">Busca a cambio: </span>
@@ -479,12 +416,7 @@ function PostCard({
 
               <div className="flex flex-wrap gap-2 mt-4">
                 {!isOwner && phone && (
-                  <a
-                    href={waContactLink(phone, p.title)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="btn btn-primary w-full"
-                  >
+                  <a href={waContactLink(phone, p.title)} target="_blank" rel="noopener noreferrer" className="btn btn-primary w-full">
                     <MessageCircle size={16} /> {contactLabel(p.type)}
                   </a>
                 )}
@@ -526,15 +458,7 @@ function PostCard({
   );
 }
 
-function PostForm({
-  userId,
-  isOfficial,
-  onDone,
-}: {
-  userId: string;
-  isOfficial: boolean;
-  onDone: () => void;
-}) {
+function PostForm({ userId, isAdmin, onDone }: { userId: string; isAdmin: boolean; onDone: () => void }) {
   const [type, setType] = useState<PostType>("VENTA");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -547,7 +471,7 @@ function PostForm({
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setErr(null);
-    if (isSale(type) && !isOfficial && !price) {
+    if (isSale(type) && !isAdmin && !price) {
       setErr("El precio es obligatorio en las ventas.");
       return;
     }
@@ -575,7 +499,6 @@ function PostForm({
     });
     setSaving(false);
     if (error) {
-      // Muestra los errores de reglas (límite diario, precio, etc.) que lanza la base de datos.
       setErr(error.message);
       return;
     }
@@ -588,12 +511,7 @@ function PostForm({
         <p className="text-sm font-semibold mb-2">¿Qué quieres publicar?</p>
         <div className="grid grid-cols-2 gap-2">
           {CREATE_TYPES.map((t) => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => setType(t)}
-              className={`btn ${type === t ? "btn-primary" : "btn-outline"}`}
-            >
+            <button key={t} type="button" onClick={() => setType(t)} className={`btn ${type === t ? "btn-primary" : "btn-outline"}`}>
               {TYPE_LABEL[t]}
             </button>
           ))}
@@ -601,39 +519,20 @@ function PostForm({
         <p className="text-xs text-muted mt-2">{TYPE_HINT[type]}</p>
       </div>
 
-      <input
-        required
-        placeholder="Título (ej: Lote 5 Hot Wheels Mainline 2026)"
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        className="input"
-      />
-      <textarea
-        placeholder="Descripción (estado, cantidad, detalles del lote...)"
-        value={description}
-        onChange={(e) => setDescription(e.target.value)}
-        className="input"
-        rows={3}
-      />
+      <input required placeholder="Título (ej: Lote 5 Hot Wheels Mainline 2026)" value={title} onChange={(e) => setTitle(e.target.value)} className="input" />
+      <textarea placeholder="Descripción (estado, cantidad, detalles del lote...)" value={description} onChange={(e) => setDescription(e.target.value)} className="input" rows={3} />
       {isSale(type) && (
         <input
           type="number"
           inputMode="numeric"
-          placeholder={
-            isOfficial ? "Precio en pesos (opcional para tiendas)" : "Precio en pesos (obligatorio)"
-          }
+          placeholder={isAdmin ? "Precio en pesos (opcional para admin/tienda)" : "Precio en pesos (obligatorio)"}
           value={price}
           onChange={(e) => setPrice(e.target.value)}
           className="input"
         />
       )}
       {isTrade(type) && (
-        <input
-          placeholder="¿Qué buscas a cambio? (nombre del auto o descripción)"
-          value={tradeFor}
-          onChange={(e) => setTradeFor(e.target.value)}
-          className="input"
-        />
+        <input placeholder="¿Qué buscas a cambio? (nombre del auto o descripción)" value={tradeFor} onChange={(e) => setTradeFor(e.target.value)} className="input" />
       )}
 
       <PhotoPicker files={files} onFilesChange={setFiles} max={MAX_PHOTOS} />

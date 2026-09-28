@@ -6,7 +6,7 @@ import { supabase, Post } from "../../../lib/supabase";
 import { formatCLP } from "../../../lib/format";
 import { TYPE_LABEL, contactLabel } from "../../../lib/postTypes";
 import { waContactLink } from "../../../lib/whatsapp";
-import PhotoStrip from "../../../components/PhotoStrip";
+import Gallery from "../../../components/Gallery";
 import ThemeToggle from "../../../components/ThemeToggle";
 
 export default function PostDetailPage() {
@@ -18,7 +18,7 @@ export default function PostDetailPage() {
     if (!id) return;
     supabase
       .from("posts")
-      .select("*, profiles(username, is_official, phone)")
+      .select("*, profiles(username, is_admin, phone)")
       .eq("id", id)
       .maybeSingle()
       .then(({ data }) => setPost((data as any) || null));
@@ -50,11 +50,11 @@ export default function PostDetailPage() {
         <ThemeToggle />
       </div>
       <div className="card p-4">
-        <PhotoStrip urls={post.photo_urls || []} alt={post.title} />
+        <Gallery urls={post.photo_urls || []} alt={post.title} ratio="aspect-square" />
         <div className="mt-3">
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="chip-blue">{TYPE_LABEL[post.type]}</span>
-            {post.profiles?.is_official && <span className="tagchip">Tienda</span>}
+            {post.profiles?.is_admin && <span className="tagchip">Tienda</span>}
             {post.status === "VENDIDO" && <span className="chip-flame">Vendido</span>}
           </div>
           <h1 className="text-2xl leading-tight mt-2">{post.title}</h1>

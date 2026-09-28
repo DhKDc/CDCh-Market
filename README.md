@@ -11,12 +11,13 @@ el chat del grupo, no en la app.)
 - Toda cuenta nueva queda **PENDIENTE** hasta que un admin del sitio la apruebe
   desde `/admin`, comparando el teléfono contra la lista del grupo de WhatsApp.
 - Máx. 3 publicaciones de **VENTA** por usuario cada 24 horas, y precio obligatorio,
-  salvo cuentas `is_official` (tiendas oficiales / admins del grupo).
+  salvo cuentas admin/tienda oficial (`is_admin`).
 - **PERMUTA** exige indicar qué se busca a cambio.
 - Publicaciones vigentes **7 días** o hasta marcarse vendidas.
 - Hasta **6 fotos** por publicación (útil para lotes); se pueden agregar/quitar al editar.
-- Admin del sitio (`is_admin`) es un rol distinto de tienda/admin del grupo
-  (`is_official`): el primero modera todo, el segundo solo se exime del límite de ventas.
+- Un solo rol de administración (`is_admin`): aprueba usuarios, modera todo el contenido,
+  sube Novedades y no tiene límite de ventas ni precio obligatorio. No hay un rol separado
+  de "tienda oficial".
 
 ## 1. Crear el proyecto en Supabase (gratis)
 1. https://supabase.com → "New project".
@@ -77,6 +78,9 @@ SQL Editor, en orden, las migraciones que aún no hayas corrido:
 6. `migration-7-ambos-novedades.sql` (publicaciones "venta y permuta", reglas de ventas
    y la sección de Novedades con "más vistas de la semana"). Ejecútala **antes** de
    subir el código nuevo, o el formulario de publicar fallará.
+7. `migration-8-permisos-roles.sql` (arregla "permission denied" en Novedades y en
+   resetear contraseña; y unifica los dos roles de admin en uno solo — ver abajo)
+
 
 Y luego, en Supabase: **Authentication → Providers → Email → desactiva "Confirm email"**.
 Después haz push al repo y Vercel redeploya.
@@ -135,7 +139,7 @@ update auth.users
 - **Venta**, **Permuta**, **Venta y permuta** (ambas) y **Busco**.
 - Solo las ventas (Venta y "Venta y permuta") tienen precio obligatorio y el tope de
   **3 por día**. Permutas y búsquedas no tienen límite.
-- Las tiendas oficiales y admins del grupo (`is_official`) no tienen tope ni precio obligatorio.
+- Las cuentas admin/tienda oficial (`is_admin`) no tienen tope ni precio obligatorio.
 - El botón **Contactar** abre WhatsApp con el mensaje: *Hola! Te hablo por "<título>" que vi
   en Culture Diecast Chile Market*.
 
@@ -150,3 +154,17 @@ Los colores viven en variables CSS en `app/globals.css` (`--brand` azul, `--flam
 `--app`/`--surface`/`--line` para fondos y bordes, tema oscuro por defecto y versión clara).
 Para ajustar la paleta basta con cambiar esos valores. Se usa la fuente Poppins (Google Fonts)
 e íconos de `lucide-react`. No se usa el logo de Hot Wheels (es marca de Mattel).
+
+## Novedades y anuncios — quién puede subirlas
+Cualquier cuenta con el rol admin/tienda oficial puede publicar una novedad directamente
+desde el botón + en la página **Novedades**, sin entrar al panel `/admin`. El panel admin
+también tiene su propia pestaña Novedades, con lo mismo más la opción de editar/eliminar
+cualquiera. Cada novedad muestra quién la subió. El botón de WhatsApp solo aparece en
+Próximamente, Preventa y Rifa — una Novedad simple (noticia) no lo necesita.
+
+## Galería de fotos
+Todas las fotos (publicaciones y novedades) usan una galería con deslizar entre fotos y
+zoom con el gesto de pellizco directo sobre la imagen — no hay una vista aparte de "zoom".
+
+## Navegación
+Barra inferior fija con dos destinos: **Mercado** (`/`) y **Novedades** (`/novedades`).
