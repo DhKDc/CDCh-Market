@@ -8,7 +8,9 @@ export const WHATSAPP_GROUP_LINK =
 // ni se muestra al usuario, y por eso también hay que desactivar "Confirm
 // email" en el dashboard de Supabase (ver README) — de lo contrario nadie
 // podría confirmar un correo que no existe.
-const AUTH_EMAIL_DOMAIN = "cdch-market.local";
+// Configurable con NEXT_PUBLIC_AUTH_EMAIL_DOMAIN. Si Supabase rechaza este dominio
+// como "invalid", pon uno tuyo (ej: un dominio que ya tengas) en las variables de Vercel.
+const AUTH_EMAIL_DOMAIN = process.env.NEXT_PUBLIC_AUTH_EMAIL_DOMAIN || "cdch-market.app";
 
 export function usernameToSlug(username: string): string {
   return username

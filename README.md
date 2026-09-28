@@ -98,3 +98,15 @@ La app se puede instalar en el celular sin pasar por tiendas:
 - Requiere HTTPS (Vercel ya lo da). Íconos en `public/icons/`, manifest en `app/manifest.ts`.
 - El service worker (`public/sw.js`) no guarda nada en caché a propósito: las
   publicaciones y fotos siempre se cargan frescas, así que no funciona sin internet.
+
+## Cuentas antiguas y problemas de login/registro
+- **Cuentas creadas antes del cambio (con correo real)**: entran escribiendo su
+  *correo completo* en el campo "Usuario". Su nombre de usuario sigue siendo la parte
+  antes de la @ y queda ocupado (nadie más puede registrarlo).
+- **"Ese nombre de usuario ya existe"**: la app revisa antes de registrar. Si igual sale
+  un error de base de datos al registrarse, casi siempre es un nombre repetido.
+- **"Email address ... is invalid"**: Supabase rechazó el correo interno que arma la app
+  (`usuario@cdch-market.app`). Define `NEXT_PUBLIC_AUTH_EMAIL_DOMAIN` en Vercel con un
+  dominio tuyo (ej. `tudominio.cl`), redeploya y prueba con un usuario nuevo. Ojo: cambiar
+  el dominio después de tener usuarios registrados los deja sin poder entrar con usuario,
+  así que hazlo antes de abrir el registro al grupo.
