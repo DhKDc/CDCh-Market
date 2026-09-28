@@ -2,14 +2,13 @@
 import { useEffect, useState, useCallback } from "react";
 import { supabase, Profile, Post } from "../../lib/supabase";
 import { COMMUNITY_NAME, WHATSAPP_GROUP_LINK } from "../../lib/config";
+import { displayPhone } from "../../lib/format";
 import ThemeToggle from "../../components/ThemeToggle";
 
 const TYPE_LABEL: Record<string, string> = {
   VENTA: "Venta",
   PERMUTA: "Permuta",
-  CACERIA: "Cacería",
   BUSCO: "Busco",
-  EXPO: "Expo",
 };
 
 export default function AdminPage() {
@@ -18,6 +17,9 @@ export default function AdminPage() {
   const [todos, setTodos] = useState<Profile[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
   const [tab, setTab] = useState<"pendientes" | "todos" | "publicaciones">("pendientes");
+  const [resetInfo, setResetInfo] = useState<{ username: string; phone: string | null; password: string } | null>(null);
+  const [justApproved, setJustApproved] = useState<Profile | null>(null);
+  const [resetErr, setResetErr] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const { data: p } = await supabase
@@ -59,12 +61,49 @@ export default function AdminPage() {
     load();
   }
 
+  async function approve(p: Profile) {
+    await setStatus(p.id, "APROBADO");
+    setJustApproved(p);
+  }
+
   async function toggleFlag(p: Profile, field: "is_official" | "is_admin") {
     if (field === "is_admin" && p.id === me?.id && p.is_admin) {
       if (!confirm("Te vas a quitar el permiso de admin del sitio a ti mismo. ¿Continuar?")) return;
     }
     await supabase.from("profiles").update({ [field]: !p[field] }).eq("id", p.id);
     load();
+  }
+
+  // Abre WhatsApp con un mensaje listo para el usuario.
+  function waTo(phone: string | null, text: string) {
+    if (!phone) return;
+    const digits = phone.replace(/\D/g, "");
+    window.open(`https://wa.me/${digits}?text=${encodeURIComponent(text)}`, "_blank");
+  }
+
+  function notifyApproved(p: Profile) {
+    waTo(
+      p.phone,
+      `Hola ${p.username}! Ya aprobé tu cuenta en Diecast Chile Market 🚗 Puedes entrar y publicar aquí: ${window.location.origin}`
+    );
+  }
+
+  async function resetPassword(p: Profile) {
+    if (!confirm(`¿Generar una contraseña temporal nueva para ${p.username}? La anterior dejará de funcionar.`)) return;
+    setResetErr(null);
+    setResetInfo(null);
+    const { data: sess } = await supabase.auth.getSession();
+    const res = await fetch("/api/admin/reset-password", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${sess.session?.access_token}`,
+      },
+      body: JSON.stringify({ userId: p.id }),
+    });
+    const json = await res.json();
+    if (!res.ok) return setResetErr(json.error || "No se pudo resetear la contraseña.");
+    setResetInfo({ username: p.username, phone: p.phone, password: json.password });
   }
 
   if (me === undefined) return null;
@@ -126,6 +165,59 @@ export default function AdminPage() {
         </p>
       )}
 
+      {justApproved && (
+        <div className="mb-3 p-3 rounded-lg border border-emerald-500 bg-emerald-500/10 text-sm flex flex-wrap items-center gap-2">
+          <span>
+            ✅ <b>{justApproved.username}</b> aprobado.
+          </span>
+          {justApproved.phone && (
+            <button
+              onClick={() => notifyApproved(justApproved)}
+              className="text-xs bg-green-600 hover:bg-green-500 text-white px-3 py-1 rounded font-semibold"
+            >
+              📱 Avisarle por WhatsApp
+            </button>
+          )}
+          <button
+            onClick={() => setJustApproved(null)}
+            className="text-xs bg-slate-200 dark:bg-slate-700 px-3 py-1 rounded"
+          >
+            Cerrar
+          </button>
+        </div>
+      )}
+      {resetErr && <p className="text-sm text-red-500 mb-3">{resetErr}</p>}
+      {resetInfo && (
+        <div className="mb-3 p-3 rounded-lg border border-amber-500 bg-amber-500/10 text-sm">
+          <p>
+            Contraseña temporal de <b>{resetInfo.username}</b>:{" "}
+            <code className="font-mono font-bold select-all">{resetInfo.password}</code>
+          </p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+            Solo se muestra ahora. Envíasela por WhatsApp y pídele que la cambie.
+          </p>
+          <div className="flex gap-2 mt-2">
+            <button
+              onClick={() =>
+                waTo(
+                  resetInfo.phone,
+                  `Hola ${resetInfo.username}! Tu contraseña temporal en Diecast Chile Market es: ${resetInfo.password} (usuario: ${resetInfo.username}). Entra en ${window.location.origin}`
+                )
+              }
+              className="text-xs bg-green-600 hover:bg-green-500 text-white px-3 py-1 rounded font-semibold"
+            >
+              📱 Enviar por WhatsApp
+            </button>
+            <button
+              onClick={() => setResetInfo(null)}
+              className="text-xs bg-slate-200 dark:bg-slate-700 px-3 py-1 rounded"
+            >
+              Cerrar
+            </button>
+          </div>
+        </div>
+      )}
+
       {tab !== "publicaciones" && (
         <div className="flex flex-col gap-2">
           {lista.map((p) => (
@@ -147,7 +239,7 @@ export default function AdminPage() {
                     </span>
                   )}
                 </p>
-                <p className="text-sm text-amber-600 dark:text-amber-300">{p.phone || "sin teléfono"}</p>
+                <p className="text-sm text-amber-600 dark:text-amber-300">{p.phone ? displayPhone(p.phone) : "sin teléfono"}</p>
                 <p className="text-xs text-slate-500">
                   {p.status} · registrado {new Date(p.created_at).toLocaleDateString("es-CL")}
                 </p>
@@ -155,7 +247,7 @@ export default function AdminPage() {
               <div className="flex flex-wrap gap-2">
                 {p.status !== "APROBADO" && (
                   <button
-                    onClick={() => setStatus(p.id, "APROBADO")}
+                    onClick={() => approve(p)}
                     className="text-xs bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1 rounded"
                   >
                     Aprobar
@@ -180,6 +272,20 @@ export default function AdminPage() {
                   className="text-xs bg-slate-200 dark:bg-slate-700 px-3 py-1 rounded"
                 >
                   {p.is_admin ? "Quitar admin del sitio" : "Hacer admin del sitio"}
+                </button>
+                {p.status === "APROBADO" && p.phone && (
+                  <button
+                    onClick={() => notifyApproved(p)}
+                    className="text-xs bg-green-600 hover:bg-green-500 text-white px-3 py-1 rounded font-semibold"
+                  >
+                    📱 Avisar aprobación
+                  </button>
+                )}
+                <button
+                  onClick={() => resetPassword(p)}
+                  className="text-xs bg-slate-200 dark:bg-slate-700 px-3 py-1 rounded"
+                >
+                  🔑 Resetear contraseña
                 </button>
               </div>
             </div>

@@ -1,11 +1,12 @@
 "use client";
 import { useState } from "react";
 import { supabase } from "../lib/supabase";
-import { COMMUNITY_NAME, WHATSAPP_GROUP_LINK } from "../lib/config";
+import { COMMUNITY_NAME, WHATSAPP_GROUP_LINK, usernameToSyntheticEmail } from "../lib/config";
+import { normalizePhone, isValidChileanMobile } from "../lib/format";
 import ThemeToggle from "../components/ThemeToggle";
 
 export default function AuthForm() {
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [phone, setPhone] = useState("");
   const [mode, setMode] = useState<"login" | "signup">("login");
@@ -16,20 +17,41 @@ export default function AuthForm() {
     e.preventDefault();
     setLoading(true);
     setMsg(null);
+
+    const email = usernameToSyntheticEmail(username);
+
+    if (mode === "signup" && !isValidChileanMobile(phone)) {
+      setLoading(false);
+      setMsg("Ingresa un número chileno válido, ej: +56 9 1234 5678.");
+      return;
+    }
+
     const { error } =
       mode === "login"
         ? await supabase.auth.signInWithPassword({ email, password })
         : await supabase.auth.signUp({
             email,
             password,
-            options: { data: { phone } },
+            options: { data: { username: username.trim(), phone: normalizePhone(phone) } },
           });
+
     setLoading(false);
-    if (error) setMsg(error.message);
-    else if (mode === "signup")
+    if (error) {
+      // "User already registered" -> el username ya existe
+      if (error.message.toLowerCase().includes("already registered")) {
+        setMsg("Ese nombre de usuario ya existe. Prueba con otro.");
+      } else if (mode === "login" && error.message.toLowerCase().includes("invalid login")) {
+        setMsg("Usuario o contraseña incorrectos.");
+      } else {
+        setMsg(error.message);
+      }
+      return;
+    }
+    if (mode === "signup") {
       setMsg(
         `Cuenta creada. Un administrador revisará tu número de teléfono contra el grupo "${COMMUNITY_NAME}" antes de habilitarte para publicar.`
       );
+    }
   }
 
   return (
@@ -44,11 +66,13 @@ export default function AuthForm() {
       <form onSubmit={submit} className="flex flex-col gap-3">
         <input
           className="bg-slate-100 dark:bg-slate-900 rounded px-3 py-2"
-          type="email"
-          placeholder="Correo"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          type="text"
+          placeholder="Nombre de usuario"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
           required
+          minLength={3}
+          autoCapitalize="none"
         />
         <input
           className="bg-slate-100 dark:bg-slate-900 rounded px-3 py-2"
@@ -63,7 +87,7 @@ export default function AuthForm() {
           <input
             className="bg-slate-100 dark:bg-slate-900 rounded px-3 py-2"
             type="tel"
-            placeholder="Teléfono (el mismo del grupo de WhatsApp, ej: +56912345678)"
+            placeholder="Teléfono (el mismo del grupo, ej: +56 9 1234 5678)"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
             required

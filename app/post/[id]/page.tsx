@@ -3,13 +3,12 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { supabase, Post } from "../../../lib/supabase";
 import ZoomableImage from "../../../components/ZoomableImage";
+import { formatCLP } from "../../../lib/format";
 
 const TYPE_LABEL: Record<string, string> = {
   VENTA: "Venta",
   PERMUTA: "Permuta",
-  CACERIA: "Cacería",
   BUSCO: "Busco",
-  EXPO: "Expo",
 };
 
 function waLink(phone: string, title: string) {
@@ -58,8 +57,21 @@ export default function PostDetailPage() {
         ← Ver todas las publicaciones
       </a>
       <div className="bg-white dark:bg-slate-800 rounded-xl overflow-hidden mt-3 border border-slate-200 dark:border-transparent">
-        {post.photo_url && (
-          <ZoomableImage src={post.photo_url} alt={post.title} className="w-full max-h-96 object-cover" />
+        {post.photo_urls?.length > 0 && (
+          <div className="flex gap-1 overflow-x-auto bg-slate-100 dark:bg-slate-900">
+            {post.photo_urls.map((u, i) => (
+              <ZoomableImage
+                key={i}
+                src={u}
+                alt={`${post.title} (${i + 1}/${post.photo_urls.length})`}
+                className={
+                  post.photo_urls.length === 1
+                    ? "w-full max-h-96 object-contain"
+                    : "h-72 w-auto max-w-none object-contain flex-none"
+                }
+              />
+            ))}
+          </div>
         )}
         <div className="p-4">
           <div className="flex justify-between items-start">
@@ -77,7 +89,7 @@ export default function PostDetailPage() {
           )}
           {post.price != null && (
             <p className="text-amber-600 dark:text-amber-300 font-bold text-lg mt-2">
-              ${post.price.toLocaleString("es-CL")}
+              {formatCLP(post.price)}
             </p>
           )}
           {post.trade_for && (

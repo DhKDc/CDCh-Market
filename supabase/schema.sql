@@ -1,13 +1,19 @@
 -- Diecast Chile Market — esquema de base de datos para Supabase
 -- Ejecutar completo en el SQL Editor de tu proyecto Supabase.
+--
+-- IMPORTANTE (registro sin correo real): en Supabase Dashboard ve a
+-- Authentication → Providers → Email y DESACTIVA "Confirm email". El
+-- registro de esta app usa un correo sintético interno (nadie lo ve ni lo
+-- recibe), así que si dejas la confirmación activada nadie podrá crear
+-- cuenta (Supabase esperaría un clic en un correo que nunca llega).
 
-create type post_type as enum ('VENTA','PERMUTA','CACERIA','BUSCO','EXPO');
+create type post_type as enum ('VENTA','PERMUTA','BUSCO');
 create type post_status as enum ('ACTIVA','VENDIDO');
 create type profile_status as enum ('PENDIENTE','APROBADO','RECHAZADO');
 
 create table profiles (
   id uuid primary key references auth.users(id) on delete cascade,
-  username text not null,
+  username text not null unique,
   phone text,
   status profile_status not null default 'PENDIENTE',
   is_official boolean not null default false,
@@ -23,19 +29,24 @@ create table posts (
   description text,
   price numeric,
   trade_for text,
-  photo_url text,
+  photo_urls text[] not null default '{}',
   status post_status not null default 'ACTIVA',
   created_at timestamptz not null default now(),
   expires_at timestamptz not null default (now() + interval '7 days')
 );
 
--- Crea automáticamente un perfil cuando alguien se registra, guardando el
--- teléfono que ingresó en el formulario (queda en PENDIENTE hasta que un
--- admin lo revise contra la lista de números del grupo de WhatsApp).
+-- Crea automáticamente un perfil cuando alguien se registra. El registro es
+-- solo con username + teléfono + contraseña (sin correo real) — el "email"
+-- que llega aquí es un correo sintético armado a partir del username
+-- (ver lib/config.ts), así que el username real se manda en raw_user_meta_data.
 create or replace function handle_new_user() returns trigger as $$
 begin
   insert into profiles (id, username, phone)
-    values (new.id, split_part(new.email, '@', 1), new.raw_user_meta_data ->> 'phone');
+    values (
+      new.id,
+      coalesce(new.raw_user_meta_data ->> 'username', split_part(new.email, '@', 1)),
+      new.raw_user_meta_data ->> 'phone'
+    );
   return new;
 end;
 $$ language plpgsql security definer;
@@ -155,12 +166,16 @@ create policy "cualquiera autenticado sube fotos" on storage.objects
 create policy "fotos son publicas para lectura" on storage.objects
   for select using (bucket_id = 'fotos');
 
+-- Permite que alguien SIN cuenta (ej: quien recibe un link /post/<id>
+-- compartido en el grupo) pueda ver una publicación activa.
+grant select on posts to anon;
+grant select on profiles to anon;
+
 -- Para convertir a alguien en tienda oficial (sin precio obligatorio ni
--- límite de 3), ejecuta manualmente, reemplazando el correo:
--- update profiles set is_official = true
---   where id = (select id from auth.users where email = 'tienda@ejemplo.com');
+-- límite de 3), ejecuta manualmente, reemplazando el username:
+-- update profiles set is_official = true where username = 'nombre_tienda';
 
 -- IMPRESCINDIBLE: conviértete a ti mismo (Daniel) en admin después de crear
--- tu propia cuenta por primera vez en la app, o nadie podrá aprobar a nadie:
+-- tu propia cuenta por primera vez en la app, reemplazando el username:
 -- update profiles set is_admin = true, status = 'APROBADO'
---   where id = (select id from auth.users where email = 'tu-correo@ejemplo.com');
+--   where username = 'tu_username';

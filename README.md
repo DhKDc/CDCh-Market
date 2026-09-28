@@ -1,98 +1,86 @@
 # Diecast Chile Market
 
-Web app para que la comunidad Diecast Chile publique ventas, permutas, cacerías,
-"busco" y expos — reemplazando el descontrol de WhatsApp.
+Web app para la comunidad Culture Diecast Chile: ventas, permutas y "busco" de
+carritos, reemplazando el descontrol de WhatsApp. (Cacería y Expo quedan solo en
+el chat del grupo, no en la app.)
 
-## Reglas implementadas (en la base de datos, no solo en el frontend)
-- Registro con correo + contraseña + **número de teléfono** (el mismo del grupo de WhatsApp).
-- Toda cuenta nueva queda **PENDIENTE** y no puede publicar hasta que un admin la apruebe
-  desde el Panel de administración (`/admin`), comparando el teléfono contra la lista del grupo.
-- Nadie puede auto-aprobarse: solo cuentas con `is_admin = true` pueden cambiar el estado,
-  is_admin o is_official de un perfil (protegido por trigger en la base de datos).
-- Máx. 3 publicaciones de **VENTA** por usuario cada 24 horas.
-- Las **VENTA** requieren precio, excepto cuentas marcadas como tienda oficial/admin.
-- Las **PERMUTA** exigen indicar qué se busca a cambio.
-- Cada publicación queda **vigente 7 días**, o hasta que el autor la marque como "vendido".
-- Solo el autor puede marcar su publicación como vendida.
+## Reglas (aplicadas en la base de datos, no solo en pantalla)
+- Registro con **nombre de usuario + teléfono + contraseña** (sin correo real ni
+  verificación por mail). El teléfono se normaliza a formato chileno `+569XXXXXXXX`.
+- Toda cuenta nueva queda **PENDIENTE** hasta que un admin del sitio la apruebe
+  desde `/admin`, comparando el teléfono contra la lista del grupo de WhatsApp.
+- Máx. 3 publicaciones de **VENTA** por usuario cada 24 horas, y precio obligatorio,
+  salvo cuentas `is_official` (tiendas oficiales / admins del grupo).
+- **PERMUTA** exige indicar qué se busca a cambio.
+- Publicaciones vigentes **7 días** o hasta marcarse vendidas.
+- Hasta **6 fotos** por publicación (útil para lotes); se pueden agregar/quitar al editar.
+- Admin del sitio (`is_admin`) es un rol distinto de tienda/admin del grupo
+  (`is_official`): el primero modera todo, el segundo solo se exime del límite de ventas.
 
 ## 1. Crear el proyecto en Supabase (gratis)
-1. Ve a https://supabase.com → "New project".
-2. Cuando esté listo, abre **SQL Editor** → pega el contenido de `supabase/schema.sql` → Run.
-3. Ve a **Storage** y confirma que exista el bucket `fotos` (el script lo crea; si no aparece, créalo manualmente como público).
-4. En **Project Settings → API**, copia `Project URL` y `anon public key`.
+1. https://supabase.com → "New project".
+2. **SQL Editor** → pega `supabase/schema.sql` → Run.
+3. **Authentication → Providers → Email → desactiva "Confirm email"**
+   (obligatorio: el registro usa un correo interno sintético que nadie recibe).
+4. **Storage**: confirma que exista el bucket público `fotos`.
+5. **Project Settings → API**: copia `Project URL` y `anon public key`.
 
-## 2. Configurar el proyecto localmente
+## 2. Correr local
 ```bash
-cp .env.local.example .env.local
-# pega tu URL y anon key en .env.local
+cp .env.local.example .env.local   # pega URL y anon key
 npm install
 npm run dev
 ```
-Abre http://localhost:3000
 
-## 3. Desplegar gratis (Vercel)
-1. Sube esta carpeta a un repositorio de GitHub.
-2. Ve a https://vercel.com → "New Project" → importa el repo.
-3. En "Environment Variables" agrega `NEXT_PUBLIC_SUPABASE_URL` y `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
-4. Deploy. Tu comunidad ya puede entrar desde el link público.
+## 3. Desplegar en Vercel
+Sube el repo a GitHub → Vercel → New Project → agrega las variables
+`NEXT_PUBLIC_SUPABASE_URL` y `NEXT_PUBLIC_SUPABASE_ANON_KEY` → Deploy.
 
-## 4. Convertirte en administrador (paso obligatorio, hazlo primero)
-1. Entra a la app y crea tu propia cuenta (con tu teléfono real).
-2. En el SQL Editor de Supabase, ejecuta (reemplazando tu correo):
+### Variable secreta para resetear contraseñas
+Agrega también en Vercel (Settings → Environment Variables) `SUPABASE_SERVICE_ROLE_KEY`
+con la clave `service_role` de Supabase (Project Settings → API). Es **secreta**: nunca
+con prefijo `NEXT_PUBLIC_` ni en GitHub. Solo la usa `/api/admin/reset-password`, que
+verifica en el servidor que quien llama sea admin del sitio. Sin ella, todo funciona
+excepto el botón "Resetear contraseña".
+
+## 4. Convertirte en admin (hazlo primero)
+Crea tu cuenta en la app y luego, en el SQL Editor:
 ```sql
 update profiles set is_admin = true, status = 'APROBADO'
-  where id = (select id from auth.users where email = 'tu-correo@ejemplo.com');
+  where username = 'tu_username';
 ```
-3. Recarga la app: verás el link "Panel admin" arriba a la derecha. Ahí apruebas o
-   rechazas cada solicitud nueva comparando el teléfono con tu lista del grupo de WhatsApp.
+Desde ahí todo (aprobar usuarios, permisos, editar/eliminar publicaciones) se hace
+en `/admin`, sin volver a Supabase.
 
-## 5. Marcar una cuenta como tienda oficial
-Estas cuentas no tienen límite de 3 ventas ni precio obligatorio (deben estar además
-aprobadas normalmente desde el panel admin):
-```sql
-update profiles set is_official = true
-  where id = (select id from auth.users where email = 'correo-de-la-tienda@ejemplo.com');
-```
+## Funciones para administrar la comunidad
+- **Avisar aprobación**: al aprobar a alguien aparece un botón que abre WhatsApp con un
+  mensaje listo para esa persona (también disponible en la pestaña Usuarios).
+- **Resetear contraseña**: genera una contraseña temporal (se muestra una sola vez) y la
+  puedes enviar por WhatsApp. Como no hay correo, es la forma de recuperar una cuenta.
+- **Renovar 7 días**: el dueño (o un admin) puede extender una publicación activa o vencida.
+- **Vendidas y vencidas**: se ocultan por defecto del feed de su dueño/admin, con un check
+  para mostrarlas. Para el resto de los usuarios ya estaban ocultas.
 
 ## Actualizar un proyecto que ya está desplegado
-Si ya corriste `schema.sql` antes, **no lo vuelvas a correr completo** (falla porque
-los tipos ya existen). Para traer las últimas mejoras pega y ejecuta, en este orden,
-`supabase/migration-2-moderacion.sql`, `supabase/migration-3-anon-select.sql` y
-`supabase/migration-4-admin-perfiles.sql` en el SQL Editor, y vuelve a desplegar el
-código (git push a tu repo → Vercel redeploya solo).
+**No vuelvas a correr `schema.sql`** (falla: los tipos ya existen). Ejecuta en el
+SQL Editor, en orden, las migraciones que aún no hayas corrido:
+1. `migration-2-moderacion.sql`
+2. `migration-3-anon-select.sql`
+3. `migration-4-admin-perfiles.sql` (arregla un bug: sin ella aprobar usuarios no funcionaba)
+4. `migration-5-tipos-fotos-username.sql` (quita cacería/expo y borra sus publicaciones
+   existentes, pasa a multi-foto, username único)
 
-## Novedades de esta versión
-- **Modal de detalle**: tocar la foto o el texto de una publicación abre un modal
-  con la descripción completa (ya no se corta) y la foto más grande, con zoom
-  disponible ahí adentro.
-- **Panel admin ahora controla todo, sin tocar Supabase**:
-  - Pestaña **Usuarios**: aprobar/rechazar, y marcar/quitar "tienda o admin del
-    grupo" (`is_official`) y "admin del sitio" (`is_admin`) con un botón.
-  - Pestaña **Publicaciones**: ver, editar y eliminar cualquier publicación, y
-    marcarla vendida/reactivarla, sin depender de que el dueño lo haga.
-  - **Corregí un bug**: faltaba el permiso (RLS) para que un admin editara el
-    perfil de otra persona — aprobar/rechazar probablemente no estaba
-    funcionando de verdad hasta ahora (`migration-4-admin-perfiles.sql`).
-- **Botón "🔗 Compartir"** en cada publicación: genera un link directo
-  (`/post/<id>`) que cualquiera puede abrir sin buscar nada en la app —ideal para
-  pegarlo en el grupo de WhatsApp—. En celular abre el menú nativo de compartir;
-  en escritorio copia el link. Esa página pública funciona incluso sin iniciar sesión.
-- **Admin del sitio vs. admin del grupo**: son roles distintos. `is_admin` (el que
-  aprueba cuentas en `/admin`) puede editar y eliminar cualquier publicación de
-  cualquier usuario. `is_official` sigue siendo la excepción de "tienda oficial o
-  admin del grupo" para el límite de 3 ventas/precio — si quieres que un admin del
-  sitio también tenga esa excepción, márcalo además como `is_official` (ahora se
-  hace con un botón en el panel).
-- **Buscador** en la página principal, por título, descripción o nombre de usuario.
-- **Grid responsivo**: las publicaciones se acomodan solas según el ancho de pantalla.
-- **Modo claro/oscuro** con un botón ☀️/🌙 que recuerda tu preferencia.
+Y luego, en Supabase: **Authentication → Providers → Email → desactiva "Confirm email"**.
+Después haz push al repo y Vercel redeploya.
+
+**Ojo con las cuentas existentes**: las creadas con correo real siguen funcionando
+con su correo, pero el login ahora pide *nombre de usuario*, que arma un correo
+interno distinto. Las cuentas viejas no podrán entrar con el nuevo formulario;
+lo más simple es que se registren de nuevo (o borrarlas en Authentication → Users
+y pedirles que se registren otra vez).
 
 ## Notas
-- Los imports usan rutas relativas (`../lib/...`, `../components/...`) en vez del
-  alias `@/`, que no se resolvía en el build de Vercel — si agregas archivos nuevos,
-  sigue ese mismo estilo.
-- Las fotos se comprimen en el navegador antes de subirse (liviano y rápido).
-- El login es con correo y contraseña (Supabase Auth). Se puede cambiar a
-  "magic link" (sin contraseña) más adelante si prefieren.
-- Si más adelante quieren notificaciones push o edición de fotos, son buenas
-  siguientes mejoras sobre esta base.
+- Los imports usan rutas relativas (`../lib/...`), no el alias `@/`, que no se
+  resolvía en el build de Vercel.
+- Las fotos se comprimen en el navegador antes de subirse.
+- Formatos comunes en `lib/format.ts` (pesos chilenos, teléfono `+56 9 XXXX XXXX`).

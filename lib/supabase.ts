@@ -5,7 +5,7 @@ const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string;
 
 export const supabase = createClient(url, anonKey);
 
-export type PostType = "VENTA" | "PERMUTA" | "CACERIA" | "BUSCO" | "EXPO";
+export type PostType = "VENTA" | "PERMUTA" | "BUSCO";
 export type PostStatus = "ACTIVA" | "VENDIDO";
 export type ProfileStatus = "PENDIENTE" | "APROBADO" | "RECHAZADO";
 
@@ -29,7 +29,7 @@ export type Post = {
   description: string | null;
   price: number | null;
   trade_for: string | null;
-  photo_url: string | null;
+  photo_urls: string[];
   status: PostStatus;
   created_at: string;
   expires_at: string;
